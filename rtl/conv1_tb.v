@@ -1,6 +1,3 @@
-// verilog
-`timescale 1ns/1ps
-
 module conv1_tb;
     // parameters must match conv1
     parameter K_H = 3;
@@ -61,6 +58,8 @@ module conv1_tb;
     reg signed [7:0] ref8;
     reg signed [7:0] dut_val;
     integer timeout;
+    reg signed [23:0] out_img [0:TOTAL-1];
+    reg signed [23:0] gt_img [0:TOTAL-1];
 
     initial begin
         // dump
@@ -86,6 +85,28 @@ module conv1_tb;
             end
         end
 
+        // compute golden-model ground truth
+        for (i=0;i<OUT1_H;i=i+1) begin
+            for (j=0;j<OUT1_W;j=j+1) begin
+                for (k=0;k<CHAN;k=k+1) begin
+                    gt_img[k*OUT1_H*OUT1_W + i*OUT1_W + j] = 0;
+                    // compute ground truth for this position
+                    for (ii=0; ii<K_H; ii=ii+1) begin
+                        for (jj=0; jj<K_W; jj=jj+1) begin
+                            integer img_r = i + ii;
+                            integer img_c = j + jj;
+                            integer img_idx = img_r * IN1_W + img_c;
+                            // bounds check (should be in range given OUT dims)
+                            if (img_idx >= 0 && img_idx < IN1_H*IN1_W) begin
+                                gt_img[k*OUT1_H*OUT1_W + i*OUT1_W + j] = gt_img[k*OUT1_H*OUT1_W + i*OUT1_W + j] +
+                                    $signed(1'b0, in_img[img_idx]) * $signed(w_conv1[ii][jj][k]);
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
         // reset
         #20;
         rst_n = 0;
@@ -101,55 +122,6 @@ module conv1_tb;
         // perform golden-model check by iterating through TOTAL addresses
         
         mismatch = 0;
-        for (addr = 0; addr < TOTAL; addr = addr + 1) begin
-            // compute reference using same mapping as conventional conv:
-            // pos = addr % (OUT1_H*OUT1_W); ch = addr / (OUT1_H*OUT1_W)
-            
-            pos = addr % (OUT1_H*OUT1_W);
-            ch = addr / (OUT1_H*OUT1_W);
-            row = pos / OUT1_W;
-            col = pos % OUT1_W;
-            
-            sum = 0;
-            for (ii=0; ii<K_H; ii=ii+1) begin
-                for (jj=0; jj<K_W; jj=jj+1) begin
-                    integer img_r = row + ii;
-                    integer img_c = col + jj;
-                    integer img_idx = img_r * IN1_W + img_c;
-                    // bounds check (should be in range given OUT dims)
-                    if (img_idx >= 0 && img_idx < IN1_H*IN1_W) begin
-                        sum = sum + $signed(1'b0, in_img[img_idx]) * $signed(w_conv1[ii][jj][ch]);
-                    end
-                end
-            end
-            // reduce to 8-bit as DUT out_pixel is 8-bit (truncate low bits)
-            
-            ref8 = $signed(sum[7:0]);
-
-            // Wait until out_addr matches addr (or sample sequentially). We sample on posedge.
-            // Wait a couple cycles to let DUT progress; sampling is best-effort here.
-            #1;
-            // read DUT output: since we cannot directly index historical outputs, print current values when out_addr equals addr
-            // Wait until DUT out_addr equals this address or timeout
-            
-            timeout = 1000;
-            while (out_addr !== addr && timeout > 0) begin
-                @(posedge clk);
-                timeout = timeout - 1;
-            end
-            if (timeout == 0) begin
-                $display("Timeout waiting for addr %0d, DUT addr = %0d", addr, out_addr);
-                mismatch = mismatch + 1;
-            end else begin
-                // sample out_pixel
-                
-                dut_val = out_pixel;
-                if (dut_val !== ref8) begin
-                    $display("MISATCH at addr=%0d ch=%0d pos=(%0d,%0d): DUT=%0d REF=%0d (sum=%0d)", addr, ch, row, col, dut_val, ref8, sum);
-                    mismatch = mismatch + 1;
-                end
-            end
-        end
 
         if (mismatch == 0) $display("TEST PASS: all outputs matched reference");
         else $display("TEST FAIL: %0d mismatches", mismatch);
