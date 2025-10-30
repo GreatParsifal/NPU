@@ -10,12 +10,12 @@ module conv1 #(
     input clk,
     input rst_n,
     input trigger,
-    input wire signed [7:0] in_img [0:IN1_H*IN1_W-1],
+    input wire [7:0] in_img [0:IN1_H*IN1_W-1],
     input wire signed [7:0] w_conv1 [K_H][K_W][CHAN],
-    output done,
-    output wire [7:0] out_pixel,
-    output reg [7:0] out_addr
-)
+    output reg done,
+    output reg [23:0] out_pixel,
+    output reg [10:0] out_addr
+);
 
 localparam S_IDLE = 0,
            S_CALC = 1,
@@ -23,14 +23,14 @@ localparam S_IDLE = 0,
 
 reg [2:0] state;
 
-reg signed [7:0] conv_win [K_H-1:0][K_W-1:0];
+reg [7:0] conv_win [K_H-1:0][K_W-1:0];
 reg signed [7:0] w [K_H-1:0][K_W-1:0];
 
 conv_unit dut (
     .conv_win(conv_win),
     .w(w),
     .result(out_pixel)
-)
+);
 
 // state transfer
 always @ (posedge clk) begin
@@ -56,7 +56,7 @@ always @ (posedge clk) begin
 end
 
 task update_conv_opr;
-    input wire  [7:0] addr;
+    input [7:0] addr;
     integer i,j;
     begin
         for (i=0;i<K_H;i=i+1) begin
@@ -72,34 +72,53 @@ endtask
 always @ (posedge clk) begin
     case(state)
     S_IDLE: begin
-        out_addr <= 8'b0;
-        out_pixel <= 8'bx;
+        out_addr <= 11'b0;
         update_conv_opr(out_addr);
     end
     S_CALC: begin
-        out_addr <= out_addr + 8'b1;
+        out_addr <= out_addr + 11'b1;
         update_conv_opr(out_addr);
     end
-    S_DONE:
-    default:
+    S_DONE: begin
+        // hold values
+    end
 endcase
 end
 endmodule
 
 
 
-module conv_unit (
-    input reg signed [7:0] conv_win [K_H-1:0][K_W-1:0],
-    input reg signed [7:0] w [K_H-1:0][K_W-1:0],
-    output reg signed [15:0] result
-)
+module conv_unit # (
+    parameter K_H = 3,
+    parameter K_W = 3
+)(
+    input [7:0] conv_win [K_H-1:0][K_W-1:0],
+    input signed [7:0] w [K_H-1:0][K_W-1:0],
+    output reg signed [23:0] result
+);
 
-integer i,j;
-always begin
-    for (i=0;i<K_H;i=i+1) begin
-        for (j=0;j<K_W;j=j+1) begin
-            result = result + conv_win[i][j] * w[i][j];
+localparam N = K_H * K_W;
+
+// product wires
+wire signed [23:0] prod [0:N-1];
+
+genvar gi, gj;
+generate
+    for (gi = 0; gi < K_H; gi = gi + 1) begin : GEN_ROW
+        for (gj = 0; gj < K_W; gj = gj + 1) begin : GEN_COL
+            // compute linear index for the product array
+            localparam integer IDX = gi * K_W + gj;
+            assign prod[IDX] = $signed(1'b0, conv_win[gi][gj]) * $signed(w[gi][gj]);
         end
+    end
+endgenerate
+
+// combinational accumulation of products
+integer k;
+always @* begin
+    result = 0;
+    for (k = 0; k < N; k = k + 1) begin
+        result = result + prod[k];
     end
 end
 
