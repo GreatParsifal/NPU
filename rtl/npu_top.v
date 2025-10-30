@@ -32,17 +32,12 @@ module npu_top #(
     parameter IN1_H = 16,
     parameter IN1_W = 15
 )(
-    input  wire clk,
-    input  wire rst,
-    input  wire start,
-    // External data sources (for now passed as arrays)
-    input  wire signed [7:0] img_in   [0:IN1_H*IN1_W-1],            // 16x15
-    input  wire signed [7:0] w_conv1  [0:3*3*1*10-1],               // 3x3x1x10
-    input  wire signed [7:0] w_conv2  [0:3*3*10*1-1],               // 3x3x10x1
-    input  wire signed [7:0] w_fc1    [0:132*10-1],                 // 132x10
-    input  wire signed [7:0] w_fc2    [0:9],                        // 10x1
-    output reg  done,
-    output reg  signed [23:0] out
+    input wire clk,
+    input wire rst,
+    input wire en, //enable signal
+    input wire [14:0] addr,
+    input wire [31:0] r_data,
+    input wire [31:0] w_data
 );
     // States
     localparam S_IDLE = 3'd0,
