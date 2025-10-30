@@ -13,7 +13,7 @@ module conv1 #(
     input wire [7:0] in_img [0:IN1_H*IN1_W-1],
     input wire signed [7:0] w_conv1 [K_H][K_W][CHAN],
     output reg done,
-    output reg [23:0] out_pixel,
+    output reg signed [23:0] out_pixel,
     output reg [10:0] out_addr
 );
 
@@ -43,12 +43,14 @@ always @ (posedge clk) begin
             else state <= S_IDLE;
         end
         S_CALC: begin
-            if (out_addr == OUT1_H * OUT1_W * CHAN -1 ) state <= S_DONE;
+            done <= 0;
+            if (out_addr % (OUT1_H * OUT1_W) == OUT1_H * OUT1_W -1 ) state <= S_DONE;
             else state <= S_CALC;
         end
         S_DONE: begin
-            state <= S_IDLE;
-            done <= 1;
+            done = 1;
+            if (out_addr == OUT1_H * OUT1_W * CHAN -1) state <= S_IDLE;
+            else state <= S_CALC;
         end
         default: state <= S_IDLE;
     endcase
@@ -84,42 +86,4 @@ always @ (posedge clk) begin
     end
 endcase
 end
-endmodule
-
-
-
-module conv_unit # (
-    parameter K_H = 3,
-    parameter K_W = 3
-)(
-    input [7:0] conv_win [K_H-1:0][K_W-1:0],
-    input signed [7:0] w [K_H-1:0][K_W-1:0],
-    output reg signed [23:0] result
-);
-
-localparam N = K_H * K_W;
-
-// product wires
-wire signed [23:0] prod [0:N-1];
-
-genvar gi, gj;
-generate
-    for (gi = 0; gi < K_H; gi = gi + 1) begin : GEN_ROW
-        for (gj = 0; gj < K_W; gj = gj + 1) begin : GEN_COL
-            // compute linear index for the product array
-            localparam integer IDX = gi * K_W + gj;
-            assign prod[IDX] = $signed(1'b0, conv_win[gi][gj]) * $signed(w[gi][gj]);
-        end
-    end
-endgenerate
-
-// combinational accumulation of products
-integer k;
-always @* begin
-    result = 0;
-    for (k = 0; k < N; k = k + 1) begin
-        result = result + prod[k];
-    end
-end
-
 endmodule
