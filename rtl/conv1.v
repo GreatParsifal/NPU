@@ -10,11 +10,11 @@ module conv1 #(
     input clk,
     input rst_n,
     input trigger,
-    input wire [7:0] in_img [0:IN1_H*IN1_W-1],
+    input wire [7:0] in_img [0:IN1_H-1][0:IN1_W-1],
     input wire signed [7:0] w_conv1 [K_H][K_W][CHAN],
-    output reg done,
-    output reg signed [23:0] out_pixel,
-    output reg [10:0] out_addr
+    output reg signed [23:0] out_buff [0:OUT1_H-1][0:OUT1_W-1],
+    output reg out_valid,
+    output reg [3:0] out_chan
 );
 
 localparam S_IDLE = 0,
@@ -22,9 +22,11 @@ localparam S_IDLE = 0,
            S_DONE = 2;
 
 reg [2:0] state;
+reg [7:0] out_addr;
+reg [23:0] out_pixel;
 
-reg [7:0] conv_win [K_H-1:0][K_W-1:0];
-reg signed [7:0] w [K_H-1:0][K_W-1:0];
+reg [7:0] conv_win [0:K_H-1][0:K_W-1];
+reg signed [7:0] w [0:K_H-1][0:K_W-1];
 
 conv_unit dut (
     .conv_win(conv_win),
@@ -32,39 +34,15 @@ conv_unit dut (
     .result(out_pixel)
 );
 
-// state transfer
-always @ (posedge clk) begin
-    if (~rst_n) state <= S_IDLE;
-    else begin
-        case(state)
-        S_IDLE: begin
-            done <= 0;
-            if (trigger) state <= S_CALC;
-            else state <= S_IDLE;
-        end
-        S_CALC: begin
-            done <= 0;
-            if (out_addr % (OUT1_H * OUT1_W) == OUT1_H * OUT1_W -1 ) state <= S_DONE;
-            else state <= S_CALC;
-        end
-        S_DONE: begin
-            done = 1;
-            if (out_addr == OUT1_H * OUT1_W * CHAN -1) state <= S_IDLE;
-            else state <= S_CALC;
-        end
-        default: state <= S_IDLE;
-    endcase
-    end
-end
-
 task update_conv_opr;
     input [7:0] addr;
+    input [3:0] chan;
     integer i,j;
     begin
         for (i=0;i<K_H;i=i+1) begin
             for (j=0;j<K_W;j=j+1) begin
-                conv_win[i][j] = in_img[i + (addr % (OUT1_H*OUT1_W))/OUT1_H][j + (addr % (OUT1_H*OUT1_W))%OUT1_H];
-                w[i][j] = w_conv1[i][j][addr/(OUT1_H*OUT1_W)];
+                conv_win[i][j] <= in_img[i + (addr/OUT1_W)][j + addr % OUT1_W];
+                w[i][j] <= w_conv1[i][j][chan];
             end
         end
     end
@@ -72,18 +50,44 @@ endtask
 
 // main loop
 always @ (posedge clk) begin
-    case(state)
-    S_IDLE: begin
-        out_addr <= 11'b0;
-        update_conv_opr(out_addr);
+    if (~rst_n) state <= S_IDLE;
+    else begin
+        case(state)
+        S_IDLE: begin
+            out_valid <= 0;
+            out_chan <= 4'b0;
+            out_addr <= 8'b0;
+            // update_conv_opr(out_addr, out_chan);
+            if (trigger) begin
+                state <= S_CALC;
+            end
+            else begin
+                state <= S_IDLE;
+            end
+        end
+        S_CALC: begin
+            out_valid <= 0;
+            update_conv_opr(out_addr, out_chan);
+            out_buff[out_addr / OUT1_W][out_addr % OUT1_W] <= out_pixel;
+            if (out_addr == OUT1_H * OUT1_W -1 ) begin
+                state <= S_DONE;
+            end
+            else begin
+                state <= S_CALC;
+                out_addr <= out_addr + 8'b1;
+            end
+        end
+        S_DONE: begin
+            if (out_chan == CHAN-1) state <= S_IDLE;
+            else begin
+                state <= S_CALC;
+                out_addr <= 8'b0;
+                out_chan <= out_chan + 4'b1;
+            end
+        end
+        default: state <= S_IDLE;
+    endcase
     end
-    S_CALC: begin
-        out_addr <= out_addr + 11'b1;
-        update_conv_opr(out_addr);
-    end
-    S_DONE: begin
-        // hold values
-    end
-endcase
 end
+
 endmodule

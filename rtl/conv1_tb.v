@@ -1,5 +1,5 @@
 module conv1_tb;
-    // parameters must match conv1
+    // parameters should match conv1 defaults
     parameter K_H = 3;
     parameter K_W = 3;
     parameter IN1_H = 16;
@@ -7,21 +7,29 @@ module conv1_tb;
     parameter OUT1_H = 14;
     parameter OUT1_W = 13;
     parameter CHAN = 10;
-    localparam TOTAL = OUT1_H * OUT1_W * CHAN;
 
     // signals
     reg clk;
     reg rst_n;
     reg trigger;
 
-    // flattened image array (row-major): index = row*IN1_W + col
-    reg [7:0] in_img [0:IN1_H*IN1_W-1];
-    // weights: [i][j][ch]
+    // input arrays (match conv1 ports) - use signed for easy reference math
+    reg signed [7:0] in_img [0:IN1_H-1][0:IN1_W-1];
     reg signed [7:0] w_conv1 [0:K_H-1][0:K_W-1][0:CHAN-1];
 
-    wire done;
-    wire signed [23:0] out_pixel; // matches conv1 port
-    wire [10:0] out_addr; // conv1 has this as reg output; connect as wire from DUT
+    // outputs from DUT
+    wire out_valid;
+    wire [3:0] out_chan;
+    // out_buff is 2D array of signed [23:0]
+    wire signed [23:0] out_buff [0:OUT1_H-1][0:OUT1_W-1];
+    integer finished_chan_count;
+    integer mismatches;
+    integer cycles_wait;
+    integer ch;
+    integer ii, jj;
+    integer signed [63:0] sum;
+    reg signed [23:0] ref24;
+    reg prev_valid;
 
     // instantiate DUT
     conv1 #(
@@ -38,96 +46,118 @@ module conv1_tb;
         .trigger(trigger),
         .in_img(in_img),
         .w_conv1(w_conv1),
-        .done(done),
-        .out_pixel(out_pixel),
-        .out_addr(out_addr)
+        .out_buff(out_buff),
+        .out_valid(out_valid),
+        .out_chan(out_chan)
     );
 
-    // clock
+    // clock generator
     initial begin
         clk = 0;
-        forever #5 clk = ~clk; // 10ns period
+        forever #5 clk = ~clk; // 10 ns period
     end
 
-    integer i,j,k,idx;
-    integer addr;
-    integer mismatch;
-    integer pos, ch, row, col;
-    integer ii,jj;
-    integer signed [31:0] sum;
-    reg signed [7:0] ref8;
-    reg signed [7:0] dut_val;
-    integer timeout;
-    reg signed [23:0] out_img [0:TOTAL-1];
-    reg signed [23:0] gt_img [0:TOTAL-1];
+    integer i,j,k,ri,cj;
 
+    // initialize data, apply reset, pulse trigger, and check outputs
     initial begin
-        // dump
-        $dumpfile("test_conv1.vcd");
-        $dumpvars(0, conv1_tb);
 
-        // init
-        rst_n = 1;
+        // defaults
+        rst_n = 0;
         trigger = 0;
 
-        // initialize image with deterministic values
-        for (idx = 0; idx < IN1_H*IN1_W; idx = idx + 1) begin
-            // range -16..15 pattern
-            in_img[idx] = $signed((idx % 32) - 16);
+        // initialize image with deterministic pattern (signed values)
+        for (i = 0; i < IN1_H; i = i + 1) begin
+            for (j = 0; j < IN1_W; j = j + 1) begin
+                // pattern: range -16..+15
+                in_img[i][j] = $signed(i*IN1_W + j);
+            end
         end
 
-        // initialize weights small
-        for (i=0;i<K_H;i=i+1) begin
-            for (j=0;j<K_W;j=j+1) begin
-                for (k=0;k<CHAN;k=k+1) begin
-                    w_conv1[i][j][k] = $signed(((i* K_W + j + k) % 7) - 3);
+        // initialize weights small signed values
+        for (i = 0; i < K_H; i = i + 1) begin
+            for (j = 0; j < K_W; j = j + 1) begin
+                for (k = 0; k < CHAN; k = k + 1) begin
+                    w_conv1[i][j][k] = $signed(i*K_W + j + k);
                 end
             end
         end
 
-        // compute golden-model ground truth
-        for (i=0;i<OUT1_H;i=i+1) begin
-            for (j=0;j<OUT1_W;j=j+1) begin
-                for (k=0;k<CHAN;k=k+1) begin
-                    gt_img[k*OUT1_H*OUT1_W + i*OUT1_W + j] = 0;
-                    // compute ground truth for this position
-                    for (ii=0; ii<K_H; ii=ii+1) begin
-                        for (jj=0; jj<K_W; jj=jj+1) begin
-                            integer img_r = i + ii;
-                            integer img_c = j + jj;
-                            integer img_idx = img_r * IN1_W + img_c;
-                            // bounds check (should be in range given OUT dims)
-                            if (img_idx >= 0 && img_idx < IN1_H*IN1_W) begin
-                                gt_img[k*OUT1_H*OUT1_W + i*OUT1_W + j] = gt_img[k*OUT1_H*OUT1_W + i*OUT1_W + j] +
-                                    $signed(1'b0, in_img[img_idx]) * $signed(w_conv1[ii][jj][k]);
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        // reset
+        // reset pulse
         #20;
-        rst_n = 0;
+        rst_n = 1; // release reset
         #20;
-        rst_n = 1;
 
-        // pulse trigger one cycle
+        // pulse trigger for start
         @(posedge clk);
         trigger = 1;
         @(posedge clk);
         trigger = 0;
 
-        // perform golden-model check by iterating through TOTAL addresses
+        // monitor out_valid rising edges and check results per-channel
         
-        mismatch = 0;
+        finished_chan_count = 0;
+       
+        mismatches = 0;
 
-        if (mismatch == 0) $display("TEST PASS: all outputs matched reference");
-        else $display("TEST FAIL: %0d mismatches", mismatch);
+        // previous out_valid for edge detection
+        
+        prev_valid = 0;
 
-        #20;
+        // wait until all channels are produced or timeout
+        
+        cycles_wait = 0;
+        while (finished_chan_count < CHAN && cycles_wait < 200000) begin
+            @(posedge clk);
+            cycles_wait = cycles_wait + 1;
+            if (out_valid && !prev_valid) begin
+                // rising edge: capture channel index
+                
+                ch = out_chan;
+                $display("Detected out_valid for channel %0d at time %0t", ch, $time);
+
+                // compute reference for this channel and compare whole out_buff
+                for (ri = 0; ri < OUT1_H; ri = ri + 1) begin
+                    for (cj = 0; cj < OUT1_W; cj = cj + 1) begin
+                        
+                        sum = 0;
+                        for (ii = 0; ii < K_H; ii = ii + 1) begin
+                            for (jj = 0; jj < K_W; jj = jj + 1) begin
+                                // input pixel at (ri+ii, cj+jj)
+                                sum = sum + $signed(in_img[ri+ii][cj+jj]) * $signed(w_conv1[ii][jj][ch]);
+                            end
+                        end
+                        // DUT stores 24-bit signed result per element (out_buff)
+                        // compare lower 24 bits (signed)
+
+                        ref24 = $signed({sum[31],sum[22:0]});
+                        if (out_buff[ri][cj] !== ref24) begin
+                            $display("Mismatch ch=%0d pos=(%0d,%0d): DUT=%0d REF=%0d sum=%0d", ch, ri, cj, out_buff[ri][cj], ref24, sum);
+                            mismatches = mismatches + 1;
+                        end
+                    end
+                end
+
+                finished_chan_count = finished_chan_count + 1;
+            end
+            prev_valid = out_valid;
+        end
+
+        if (cycles_wait >= 200000) begin
+            $display("Timeout waiting for channels, finished %0d/%0d", finished_chan_count, CHAN);
+        end
+
+        if (mismatches == 0) $display("conv1_tb: TEST PASS - all channels matched reference");
+        else $display("conv1_tb: TEST FAIL - %0d mismatches found", mismatches);
+
+        #100;
         $finish;
+    end
+
+    initial begin
+        $fsdbDumpfile("conv1_tb.fsdb");
+        $fsdbDumpvars(0, conv1_tb);
+        $fsdbDumpMDA();
     end
 
 endmodule
