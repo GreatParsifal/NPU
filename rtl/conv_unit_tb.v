@@ -23,6 +23,7 @@ module conv_unit_tb;
 
     // testbench
     initial begin
+        repeat(5) begin
         gt = 24'b0;
         // initialize inputs
         for (i=0;i<K_H;i=i+1) begin
@@ -42,7 +43,8 @@ module conv_unit_tb;
 
         // finish simulation
         #10;
-        $finish;
+    end
+    $finish;
     end
 
     initial begin

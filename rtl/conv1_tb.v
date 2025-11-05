@@ -14,7 +14,7 @@ module conv1_tb;
     reg trigger;
 
     // input arrays (match conv1 ports) - use signed for easy reference math
-    reg signed [7:0] in_img [0:IN1_H-1][0:IN1_W-1];
+    reg [7:0] in_img [0:IN1_H-1][0:IN1_W-1];
     reg signed [7:0] w_conv1 [0:K_H-1][0:K_W-1][0:CHAN-1];
 
     // outputs from DUT
@@ -70,7 +70,7 @@ module conv1_tb;
         for (i = 0; i < IN1_H; i = i + 1) begin
             for (j = 0; j < IN1_W; j = j + 1) begin
                 // pattern: range -16..+15
-                in_img[i][j] = $signed(i*IN1_W + j);
+                in_img[i][j] = $random();
             end
         end
 
@@ -78,7 +78,7 @@ module conv1_tb;
         for (i = 0; i < K_H; i = i + 1) begin
             for (j = 0; j < K_W; j = j + 1) begin
                 for (k = 0; k < CHAN; k = k + 1) begin
-                    w_conv1[i][j][k] = $signed(i*K_W + j + k);
+                    w_conv1[i][j][k] = $random();
                 end
             end
         end
@@ -120,17 +120,16 @@ module conv1_tb;
                 for (ri = 0; ri < OUT1_H; ri = ri + 1) begin
                     for (cj = 0; cj < OUT1_W; cj = cj + 1) begin
                         
-                        sum = 0;
+                        ref24 = 0;
                         for (ii = 0; ii < K_H; ii = ii + 1) begin
                             for (jj = 0; jj < K_W; jj = jj + 1) begin
                                 // input pixel at (ri+ii, cj+jj)
-                                sum = sum + $signed(in_img[ri+ii][cj+jj]) * $signed(w_conv1[ii][jj][ch]);
+                                ref24 = ref24 + $signed({1'b0, in_img[ri+ii][cj+jj]}) * $signed(w_conv1[ii][jj][ch]);
                             end
                         end
+                        ref24 = ref24[23] ? 24'b0 : ref24; // ReLU
                         // DUT stores 24-bit signed result per element (out_buff)
                         // compare lower 24 bits (signed)
-
-                        ref24 = $signed({sum[31],sum[22:0]});
                         if (out_buff[ri][cj] !== ref24) begin
                             $display("Mismatch ch=%0d pos=(%0d,%0d): DUT=%0d REF=%0d sum=%0d", ch, ri, cj, out_buff[ri][cj], ref24, sum);
                             mismatches = mismatches + 1;
@@ -144,11 +143,11 @@ module conv1_tb;
         end
 
         if (cycles_wait >= 200000) begin
-            $display("Timeout waiting for channels, finished %0d/%0d", finished_chan_count, CHAN);
+            $display("\nTimeout waiting for channels, finished %0d/%0d\n", finished_chan_count, CHAN);
         end
 
-        if (mismatches == 0) $display("conv1_tb: TEST PASS - all channels matched reference");
-        else $display("conv1_tb: TEST FAIL - %0d mismatches found", mismatches);
+        if (mismatches == 0) $display("\nconv1_tb: TEST PASS - all channels matched reference\n");
+        else $display("\nconv1_tb: TEST FAIL - %0d mismatches found\n", mismatches);
 
         #100;
         $finish;

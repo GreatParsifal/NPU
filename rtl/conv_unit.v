@@ -30,6 +30,7 @@ always @* begin
     for (k = 0; k < N; k = k + 1) begin
         result = result + prod[k];
     end
+    result = result[23] ? 24'b0 : result; // ReLU
 end
 
 endmodule
