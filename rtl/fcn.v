@@ -1,38 +1,35 @@
-// FC1: IN=132, OUT=10
-// FC2: IN=10, OUT=1
-//already tested by Verilator
+// fcn.v
 `include "pe_unit_fcn.v"
-module fcn (
-    input  wire clk,
-    input  wire rst_n,
-    // external write interfaces
-    input  wire        in_wr,        // 写入输入向量
-    input  wire [7:0]  in_addr,      // 0..131
-    input  wire signed [7:0] in_data, // 输入数据
 
-    input  wire        fc1_w_wr,     // 写入 fc1 权重
-    input  wire [15:0] fc1_w_addr,   // 地址: neuron_idx * 132 + weight_idx
-    input  wire signed [7:0] fc1_w_data,
+module fcn #(
+    parameter int IN1_N  = 132,
+    parameter int OUT1_M = 10
+)(
+    input  clk,
+    input  rst_n,
 
-    input  wire        fc2_w_wr,     // 写入 fc2 权重 (0..9)
-    input  wire [3:0]  fc2_w_addr,
-    input  wire signed [7:0] fc2_w_data,
+    // write ports
+    input  in_vec_wr,               // write input
+    input  wire [7:0]  in_vec_array [0:IN1_N-1],    // [0] .. [IN1_N-1]
 
-    input  wire        start,
-    output reg         done,
-    output reg signed [23:0] fc2_logit
+    input  fc1_w_wr_all,            // write entire fc1 weight matrix in one cycle
+    input  wire  signed [7:0] fc1_w_array  [0:OUT1_M-1][0:IN1_N-1], // neuron-major: [neuron][weight_idx]
+
+    input  fc2_w_wr_all,            // write entire fc2 weight vector in one cycle
+    input  wire  signed [7:0] fc2_w_array  [0:OUT1_M-1],   // fc2_w_array[0..OUT1_M-1]
+
+    // control and outputs
+    input  start,
+    output logic done,
+    output logic signed [23:0] fc2_logit
 );
 
-    // parameters
-    localparam IN1_N = 132;
-    localparam OUT1_M = 10;
+    // internal memories (same layout as before)
+    reg signed [7:0] in_vec  [0:IN1_N-1];
+    reg signed [7:0] fc1_w   [0:OUT1_M-1][0:IN1_N-1];
+    reg signed [7:0] fc2_w   [0:OUT1_M-1];
 
-    // internal memories
-    reg signed [7:0] in_vec [0:IN1_N-1];
-    reg signed [7:0] fc1_w [0:OUT1_M-1][0:IN1_N-1];
-    reg signed [7:0] fc2_w [0:OUT1_M-1];
-
-    // instantiate 10 PEs
+    // PEs and helpers
     wire signed [23:0] pe_out [0:OUT1_M-1];
     reg clr_all;
     reg ready_all;
@@ -57,7 +54,7 @@ module fcn (
     // FC1 outputs (internal)
     reg signed [23:0] fc1_out_relu [0:OUT1_M-1];
 
-    // FSM
+    // FSM states
     localparam S_IDLE      = 0,
                S_CLR       = 1,
                S_STREAM    = 2,
@@ -66,20 +63,15 @@ module fcn (
                S_DONE      = 5;
 
     reg [2:0] state;
-    integer j; // index over input elements (used in sequential logic)
+    integer j;
     integer i;
-
-    // Additional integer locals for address decode to avoid reusing 'j'
-    integer neuron_idx;
-    integer weight_idx;
 
     reg [3:0] fc2_idx;
     reg signed [23:0] fc2_acc;
 
-    // external write handling
-    always @(posedge clk or negedge rst_n) begin
+    // handle one-cycle array writes and reset initialization
+    always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            // initialize memories to zero (use separate loop index kk)
             integer kk, ll;
             for (kk = 0; kk < IN1_N; kk = kk + 1) in_vec[kk] <= 8'sd0;
             for (kk = 0; kk < OUT1_M; kk = kk + 1) begin
@@ -87,25 +79,33 @@ module fcn (
                 for (ll = 0; ll < IN1_N; ll = ll + 1) fc1_w[kk][ll] <= 8'sd0;
             end
         end else begin
-            if (in_wr) begin
-                if (in_addr < IN1_N) in_vec[in_addr] <= in_data;
-            end
-            if (fc1_w_wr) begin
-                // decode addr to neuron and weight idx
-                neuron_idx = fc1_w_addr / IN1_N;
-                weight_idx = fc1_w_addr % IN1_N;
-                if (neuron_idx >= 0 && neuron_idx < OUT1_M && weight_idx >=0 && weight_idx < IN1_N) begin
-                    fc1_w[neuron_idx][weight_idx] <= fc1_w_data;
+            if (in_vec_wr) begin
+                integer idx;
+                for (idx = 0; idx < IN1_N; idx = idx + 1) begin
+                    in_vec[idx] <= in_vec_array[idx];
                 end
             end
-            if (fc2_w_wr) begin
-                if (fc2_w_addr < OUT1_M) fc2_w[fc2_w_addr] <= fc2_w_data;
+
+            if (fc1_w_wr_all) begin
+                integer n, w;
+                for (n = 0; n < OUT1_M; n = n + 1) begin
+                    for (w = 0; w < IN1_N; w = w + 1) begin
+                        fc1_w[n][w] <= fc1_w_array[n][w];
+                    end
+                end
+            end
+
+            if (fc2_w_wr_all) begin
+                integer m;
+                for (m = 0; m < OUT1_M; m = m + 1) begin
+                    fc2_w[m] <= fc2_w_array[m];
+                end
             end
         end
     end
 
-    // main FSM sequential
-    always @(posedge clk or negedge rst_n) begin
+    // --- main FSM sequential ---
+    always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             state <= S_IDLE;
             j <= 0;
@@ -121,7 +121,7 @@ module fcn (
             fc2_idx <= 0;
             fc2_logit <= 24'sd0;
         end else begin
-            // default signals
+            // defaults
             clr_all <= 1'b0;
             ready_all <= 1'b0;
             done <= 1'b0;
@@ -131,45 +131,35 @@ module fcn (
                     j <= 0;
                     if (start) state <= S_CLR;
                 end
-
                 S_CLR: begin
-                    // clear all PE accumulators (one-cycle pulse)
                     clr_all <= 1'b1;
                     j <= 0;
                     state <= S_STREAM;
                 end
-
                 S_STREAM: begin
                     if (j < IN1_N) begin
                         current_x <= in_vec[j];
-                        // drive weight bus
                         for (i = 0; i < OUT1_M; i = i + 1) begin
                             w_bus[i] <= fc1_w[i][j];
                         end
-                        ready_all <= 1'b1; // perform MAC on this element
+                        ready_all <= 1'b1;
                         j <= j + 1;
                     end else begin
-                        // finished streaming
                         state <= S_FC1_DONE;
                     end
                 end
-
                 S_FC1_DONE: begin
-                    // read PE outputs and apply ReLU
                     for (i = 0; i < OUT1_M; i = i + 1) begin
                         if (pe_out[i] < 0) fc1_out_relu[i] <= 24'sd0;
                         else fc1_out_relu[i] <= pe_out[i];
                     end
-                    // prepare FC2 accumulation
                     fc2_acc <= 24'sd0;
                     fc2_idx <= 0;
                     state <= S_FC2_ACC;
                 end
-
                 S_FC2_ACC: begin
                     if (fc2_idx < OUT1_M) begin
-                        // simple truncation to 8-bit for demo (production: use consistent fixed-point)
-                        reg signed [7:0] in_x8;
+                        logic signed [7:0] in_x8;
                         in_x8 = fc1_out_relu[fc2_idx][7:0];
                         fc2_acc <= fc2_acc + $signed(fc2_w[fc2_idx]) * $signed(in_x8);
                         fc2_idx <= fc2_idx + 1;
@@ -178,12 +168,10 @@ module fcn (
                         state <= S_DONE;
                     end
                 end
-
                 S_DONE: begin
                     done <= 1'b1;
                     state <= S_IDLE;
                 end
-
                 default: state <= S_IDLE;
             endcase
         end

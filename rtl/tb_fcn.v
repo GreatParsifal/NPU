@@ -1,92 +1,75 @@
-
+// tb_fcn.v - Verilator TB for fcn (bulk array writes)
 `timescale 1ns/1ps
-`include "fc_top.v"
+`include "fcn.v"
 
 module tb_fcn;
     reg clk;
     reg rst_n;
 
-    reg in_wr;
-    reg [7:0] in_addr;
-    reg signed [7:0] in_data;
-
-    reg fc1_w_wr;
-    reg [15:0] fc1_w_addr;
-    reg signed [7:0] fc1_w_data;
-
-    reg fc2_w_wr;
-    reg [3:0] fc2_w_addr;
-    reg signed [7:0] fc2_w_data;
+    // bulk write interfaces for fcn
+    reg                             in_vec_wr;
+    reg  signed [7:0]               in_vec_array   [0:132-1];
+    reg                             fc1_w_wr_all;
+    reg  signed [7:0]               fc1_w_array    [0:10-1][0:132-1];
+    reg                             fc2_w_wr_all;
+    reg  signed [7:0]               fc2_w_array    [0:10-1];
 
     reg start;
     wire done;
     wire signed [23:0] fc2_logit;
 
-    fc_top dut (
+    // instantiate DUT
+    fcn #(.IN1_N(132), .OUT1_M(10)) dut (
         .clk(clk),
         .rst_n(rst_n),
-        .in_wr(in_wr),
-        .in_addr(in_addr),
-        .in_data(in_data),
-        .fc1_w_wr(fc1_w_wr),
-        .fc1_w_addr(fc1_w_addr),
-        .fc1_w_data(fc1_w_data),
-        .fc2_w_wr(fc2_w_wr),
-        .fc2_w_addr(fc2_w_addr),
-        .fc2_w_data(fc2_w_data),
+        .in_vec_wr(in_vec_wr),
+        .in_vec_array(in_vec_array),
+        .fc1_w_wr_all(fc1_w_wr_all),
+        .fc1_w_array(fc1_w_array),
+        .fc2_w_wr_all(fc2_w_wr_all),
+        .fc2_w_array(fc2_w_array),
         .start(start),
         .done(done),
         .fc2_logit(fc2_logit)
     );
 
-
+    // clock
     initial begin
         clk = 0;
-        forever #5 clk = ~clk; 
+        forever #5 clk = ~clk; // 100MHz-ish for sim
     end
 
     integer i, n;
     initial begin
+        // reset
         rst_n = 0;
-        in_wr = 0; fc1_w_wr = 0; fc2_w_wr = 0; start = 0;
-        in_addr = 0; in_data = 0;
-        fc1_w_addr = 0; fc1_w_data = 0;
-        fc2_w_addr = 0; fc2_w_data = 0;
+        in_vec_wr = 0; fc1_w_wr_all = 0; fc2_w_wr_all = 0; start = 0;
         #20;
         rst_n = 1;
         #20;
 
-        // For test: fill in_vec with small signed values
+        // prepare sample input vector (132 elements)
         for (i = 0; i < 132; i = i + 1) begin
-            @(posedge clk);
-            in_wr = 1;
-            in_addr = i;
-            in_data = (i % 8) - 3; // some signed small values
+            in_vec_array[i] = (i % 8) - 3; // some signed small values
         end
-        @(posedge clk);
-        in_wr = 0;
+        // write in_vec in one cycle
+        @(posedge clk); in_vec_wr = 1; @(posedge clk); in_vec_wr = 0;
 
-        // write fc1 weights: weight for neuron n and index j : (n+1)
+        // prepare fc1 weights: neuron n, index j -> (n+1)
         for (n = 0; n < 10; n = n + 1) begin
             for (i = 0; i < 132; i = i + 1) begin
-                @(posedge clk);
-                fc1_w_wr = 1;
-                fc1_w_addr = n * 132 + i;
-                fc1_w_data = (n + 1);
+                fc1_w_array[n][i] = (n + 1);
             end
         end
-        @(posedge clk);
-        fc1_w_wr = 0;
+        // write all fc1 weights in one cycle
+        @(posedge clk); fc1_w_wr_all = 1; @(posedge clk); fc1_w_wr_all = 0;
 
-        // write fc2 weights: set all to 1
+        // prepare fc2 weights: all ones
         for (i = 0; i < 10; i = i + 1) begin
-            @(posedge clk);
-            fc2_w_wr = 1;
-            fc2_w_addr = i;
-            fc2_w_data = 1;
+            fc2_w_array[i] = 8'sd1;
         end
-        @(posedge clk);
-        fc2_w_wr = 0;
+        // write all fc2 weights in one cycle
+        @(posedge clk); fc2_w_wr_all = 1; @(posedge clk); fc2_w_wr_all = 0;
 
         // start computation
         @(posedge clk);
