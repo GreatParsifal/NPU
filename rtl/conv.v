@@ -25,15 +25,13 @@ wire signed [23:0] conv2_in [0:OUT2_H-1][0:OUT2_W-1];
 wire conv1_out_valid;
 wire [3:0] conv1_out_chan;
 
-assign out_chan = conv1_out_chan;
-
 conv1 #(
     .K_H(K_H),
     .K_W(K_W),
-    .IN1_H(IN1_H),
-    .IN1_W(IN1_W),
-    .OUT1_H(OUT1_H),
-    .OUT1_W(OUT1_W),
+    .IN_H(IN1_H),
+    .IN_W(IN1_W),
+    .OUT_H(OUT1_H),
+    .OUT_W(OUT1_W),
     .CHAN(CHAN)
 ) conv1_inst (
     .clk(clk),
@@ -60,10 +58,10 @@ buffer #(
 conv2 #(
     .K_H(K_H),
     .K_W(K_W),
-    .IN1_H(OUT1_H),
-    .IN1_W(OUT1_W),
-    .OUT1_H(OUT2_H),
-    .OUT1_W(OUT2_W),
+    .IN_H(OUT1_H),
+    .IN_W(OUT1_W),
+    .OUT_H(OUT2_H),
+    .OUT_W(OUT2_W),
     .CHAN(CHAN)
 ) conv2_inst (
     .clk(clk),
@@ -73,7 +71,8 @@ conv2 #(
     .w_conv1(w_conv2), // weights for conv2
     .out_buff(out_buff), // final output buffer
     .out_valid(out_valid), // final output valid
-    .cal_chan(conv1_out_chan)  // final output channel
+    .cal_chan(conv1_out_chan),  // final output channel
+    .out_chan(out_chan)
 );
 
 endmodule

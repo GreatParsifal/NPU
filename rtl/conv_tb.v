@@ -1,5 +1,4 @@
-// Testbench for conv.v: 验证对于每个 chan， (in_img * w_conv1[][][chan]) 经过量化后再 * w_conv2[][][chan] 的结果是否正确
-
+// ...existing code...
 module conv_tb;
 
     // parameters must match conv.v (可以调整 CHAN 以加快仿真)
@@ -55,8 +54,9 @@ module conv_tb;
     integer r, c, ky, kx, ch;
     reg signed [31:0] acc1;
     reg signed [31:0] acc2;
-    reg [7:0] conv1_q [0:OUT1_H-1][0:OUT1_W-1]; // quantized conv1 output (0..127 as in conv_unit_tb 的假设)
-    reg signed [31:0] conv1_full [0:OUT1_H-1][0:OUT1_W-1];
+    // conv1 输出为 24-bit 的 conv + ReLU（无 INT8 量化），在 golden 中以 signed [23:0] 表示
+    reg signed [23:0] conv1_out_map [0:OUT1_H-1][0:OUT1_W-1]; // conv1 的最终 24-bit 输出（ReLU 后）
+    reg signed [31:0] conv1_full_acc [0:OUT1_H-1][0:OUT1_W-1]; // 用于保存 full-precision 累加结果（临时）
     reg signed [23:0] golden [0:OUT2_H-1][0:OUT2_W-1];
 
     integer errors;
@@ -75,14 +75,14 @@ module conv_tb;
         // 初始化随机输入与权重（可改为固定向量以便调试）
         for (r = 0; r < IN1_H; r = r + 1) begin
             for (c = 0; c < IN1_W; c = c + 1) begin
-                in_img[r][c] = $urandom_range(seed, 0, 255);
+                in_img[r][c] = $urandom_range(0, 255);
             end
         end
         for (ky = 0; ky < K_H; ky = ky + 1) begin
             for (kx = 0; kx < K_W; kx = kx + 1) begin
                 for (ch = 0; ch < CHAN; ch = ch + 1) begin
-                    w_conv1[ky][kx][ch] = $urandom_range(seed, -128, 127);
-                    w_conv2[ky][kx][ch] = $urandom_range(seed ^ 32'h12345678, -128, 127);
+                    w_conv1[ky][kx][ch] = $urandom_range(-128, 127);
+                    w_conv2[ky][kx][ch] = $urandom_range(-128, 127);
                 end
             end
         end
@@ -103,7 +103,7 @@ module conv_tb;
         // 对每个 channel 计算 golden 值并等待 DUT 的 out_valid/assert
         errors = 0;
         for (ch = 0; ch < CHAN; ch = ch + 1) begin
-            // step1: conv1 full precision accumulation
+            // step1: conv1 full precision accumulation -> conv1 的 24-bit 输出，并做 ReLU（非负）
             for (r = 0; r < OUT1_H; r = r + 1) begin
                 for (c = 0; c < OUT1_W; c = c + 1) begin
                     acc1 = 0;
@@ -113,22 +113,21 @@ module conv_tb;
                             acc1 = acc1 + $signed({1'b0, in_img[r + ky][c + kx]}) * $signed(w_conv1[ky][kx][ch]);
                         end
                     end
-                    conv1_full[r][c] = acc1;
-                    // 假定 conv1 buffer 对 conv1 输出进行了 0..127 的截断（参考之前 conv_unit_tb 的约定）
-                    if (acc1 < 0) conv1_q[r][c] = 0;
-                    else if (acc1 > 127) conv1_q[r][c] = 127;
-                    else conv1_q[r][c] = acc1[7:0];
+                    conv1_full_acc[r][c] = acc1;
+                    // conv1 输出为 conv + ReLU，保留 24 位（如果累加超出 24 位则截断低 24 位）
+                    if (acc1 < 0) conv1_out_map[r][c] = 0;
+                    else conv1_out_map[r][c] = acc1[23:0];
                 end
             end
 
-            // step2: conv2 使用 conv1_q 作为输入进行卷积，得到 golden final map
+            // step2: conv2 使用 conv1_out_map 作为输入进行卷积，得到 golden final map
             for (r = 0; r < OUT2_H; r = r + 1) begin
                 for (c = 0; c < OUT2_W; c = c + 1) begin
                     acc2 = 0;
                     for (ky = 0; ky < K_H; ky = ky + 1) begin
                         for (kx = 0; kx < K_W; kx = kx + 1) begin
-                            // conv1_q 是 0..127 的无符号，转换为 signed 才能与 signed weight 相乘
-                            acc2 = acc2 + $signed({1'b0, conv1_q[r + ky][c + kx]}) * $signed(w_conv2[ky][kx][ch]);
+                            // conv1_out_map 为 signed [23:0]（非负），与 signed weight 相乘
+                            acc2 = acc2 + $signed(conv1_out_map[r + ky][c + kx]) * $signed(w_conv2[ky][kx][ch]);
                         end
                     end
                     golden[r][c] = acc2[23:0]; // 截断到 24 位，与 DUT 输出类型一致
@@ -177,9 +176,10 @@ module conv_tb;
     end
 
     initial begin
-        $fsdbDumpfile("conv1_tb.fsdb");
-        $fsdbDumpvars(0, conv1_tb);
+        $fsdbDumpfile("conv_tb.fsdb");
+        $fsdbDumpvars(0, conv_tb);
         $fsdbDumpMDA();
     end
 
 endmodule
+// ...existing code...
