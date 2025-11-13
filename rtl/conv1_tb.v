@@ -2,10 +2,10 @@ module conv1_tb;
     // parameters should match conv1 defaults
     parameter K_H = 3;
     parameter K_W = 3;
-    parameter IN1_H = 16;
-    parameter IN1_W = 15;
-    parameter OUT1_H = 14;
-    parameter OUT1_W = 13;
+    parameter IN_H = 16;
+    parameter IN_W = 15;
+    parameter OUT_H = 14;
+    parameter OUT_W = 13;
     parameter CHAN = 10;
 
     // signals
@@ -14,7 +14,7 @@ module conv1_tb;
     reg trigger;
 
     // input arrays (match conv1 ports) - use signed for easy reference math
-    reg [7:0] in_img [0:IN1_H-1][0:IN1_W-1];
+    reg [7:0] in_img [0:IN_H-1][0:IN1_W-1];
     reg signed [7:0] w_conv1 [0:K_H-1][0:K_W-1][0:CHAN-1];
 
     // outputs from DUT
@@ -35,7 +35,7 @@ module conv1_tb;
     conv1 #(
         .K_H(K_H),
         .K_W(K_W),
-        .IN1_H(IN1_H),
+        .IN_H(IN_H),
         .IN1_W(IN1_W),
         .OUT1_H(OUT1_H),
         .OUT1_W(OUT1_W),
@@ -67,7 +67,7 @@ module conv1_tb;
         trigger = 0;
 
         // initialize image with deterministic pattern (signed values)
-        for (i = 0; i < IN1_H; i = i + 1) begin
+        for (i = 0; i < IN_H; i = i + 1) begin
             for (j = 0; j < IN1_W; j = j + 1) begin
                 // pattern: range -16..+15
                 in_img[i][j] = $random();
