@@ -14,6 +14,7 @@ module conv1 #(
     input wire signed [7:0] w_conv1 [K_H][K_W][CHAN],
     output reg signed [23:0] out_buff [0:OUT_H-1][0:OUT_W-1],
     output reg out_valid,
+    input [3:0] cal_chan,
     output reg [3:0] out_chan
 );
 
@@ -25,7 +26,6 @@ reg [2:0] state;
 reg [7:0] cal_addr;
 reg [7:0] save_addr;
 reg [23:0] out_pixel;
-reg [3:0] cal_chan;
 
 reg [7:0] conv_win [0:K_H-1][0:K_W-1];
 reg signed [7:0] w [0:K_H-1][0:K_W-1];
@@ -57,7 +57,6 @@ always @ (posedge clk) begin
         case(state)
         S_IDLE: begin
             out_valid <= 0;
-            cal_chan <= 4'b0;
             cal_addr <= 8'b0;
             save_addr <= 8'b0;
             if (trigger) begin
@@ -90,7 +89,7 @@ always @ (posedge clk) begin
             else begin
                 state <= S_CALC;
                 cal_addr <= 8'b0;
-                cal_chan <= cal_chan + 4'b1;
+                // cal_chan <= cal_chan + 4'b1;
             end
         end
         default: state <= S_IDLE;
