@@ -1,16 +1,16 @@
-module conv1 #(
+module conv2 #(
     K_H = 3,
     K_W = 3,
-    IN_H = 16,
-    IN_W = 15,
-    OUT_H = 14,
-    OUT_W = 13,
+    IN_H = 14,
+    IN_W = 13,
+    OUT_H = 12,
+    OUT_W = 11,
     CHAN = 10
 )(
     input clk,
     input rst_n,
     input trigger,
-    input wire [7:0] in_img [0:IN_H-1][0:IN_W-1],
+    input wire [23:0] in_img [0:IN_H-1][0:IN_W-1],
     input wire signed [7:0] w_conv1 [K_H][K_W][CHAN],
     output reg signed [23:0] out_buff [0:OUT_H-1][0:OUT_W-1],
     output reg out_valid,
