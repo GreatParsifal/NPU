@@ -14,14 +14,14 @@ module conv1_tb;
     reg trigger;
 
     // input arrays (match conv1 ports) - use signed for easy reference math
-    reg [7:0] in_img [0:IN_H-1][0:IN1_W-1];
+    reg [7:0] in_img [0:IN_H-1][0:IN_W-1];
     reg signed [7:0] w_conv1 [0:K_H-1][0:K_W-1][0:CHAN-1];
 
     // outputs from DUT
     wire out_valid;
     wire [3:0] out_chan;
     // out_buff is 2D array of signed [23:0]
-    wire signed [23:0] out_buff [0:OUT1_H-1][0:OUT1_W-1];
+    wire signed [23:0] out_buff [0:OUT_H-1][0:OUT_W-1];
     integer finished_chan_count;
     integer mismatches;
     integer cycles_wait;
@@ -36,9 +36,9 @@ module conv1_tb;
         .K_H(K_H),
         .K_W(K_W),
         .IN_H(IN_H),
-        .IN1_W(IN1_W),
-        .OUT1_H(OUT1_H),
-        .OUT1_W(OUT1_W),
+        .IN_W(IN_W),
+        .OUT_H(OUT_H),
+        .OUT_W(OUT_W),
         .CHAN(CHAN)
     ) dut (
         .clk(clk),
@@ -68,7 +68,7 @@ module conv1_tb;
 
         // initialize image with deterministic pattern (signed values)
         for (i = 0; i < IN_H; i = i + 1) begin
-            for (j = 0; j < IN1_W; j = j + 1) begin
+            for (j = 0; j < IN_W; j = j + 1) begin
                 // pattern: range -16..+15
                 in_img[i][j] = $random();
             end
@@ -117,8 +117,8 @@ module conv1_tb;
                 $display("Detected out_valid for channel %0d at time %0t", ch, $time);
 
                 // compute reference for this channel and compare whole out_buff
-                for (ri = 0; ri < OUT1_H; ri = ri + 1) begin
-                    for (cj = 0; cj < OUT1_W; cj = cj + 1) begin
+                for (ri = 0; ri < OUT_H; ri = ri + 1) begin
+                    for (cj = 0; cj < OUT_W; cj = cj + 1) begin
                         
                         ref24 = 0;
                         for (ii = 0; ii < K_H; ii = ii + 1) begin
