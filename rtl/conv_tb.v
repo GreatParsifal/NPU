@@ -22,7 +22,6 @@ module conv_tb;
 
     // outputs from DUT
     wire out_valid;
-    wire [3:0] out_chan;
     // out_buff is 2D array of signed [23:0]
     wire signed [23:0] out_buff [0:OUT2_H-1][0:OUT2_W-1];
     integer finished_chan_count;
@@ -32,6 +31,7 @@ module conv_tb;
     integer ii, jj;
 
     reg signed [23:0] conv1_out [0:OUT1_H-1][0:OUT1_W-1];
+    reg signed [23:0] conv2_out [0:OUT2_H-1][0:OUT2_W-1];
     reg signed [23:0] golden [0:OUT2_H-1][0:OUT2_W-1];
     reg prev_valid;
 
@@ -54,8 +54,7 @@ module conv_tb;
         .w_conv1(w_conv1),
         .w_conv2(w_conv2),
         .out_buff(out_buff),
-        .out_valid(out_valid),
-        .out_chan(out_chan)
+        .out_valid(out_valid)
     );
 
     // clock generator
@@ -119,39 +118,49 @@ module conv_tb;
             cycles_wait = cycles_wait + 1;
             if (out_valid && !prev_valid) begin
                 // rising edge: capture channel index
-                
-                ch = out_chan;
-                $display("Detected out_valid for channel %0d at time %0t", ch, $time);
+                $display("Detected out_valid at time %0t", $time);
 
-                // compute reference for this channel and compare whole out_buff
-                for (ri = 0; ri < OUT1_H; ri = ri + 1) begin
-                    for (cj = 0; cj < OUT1_W; cj = cj + 1) begin
-                        
-                        conv1_out[ri][cj] = 0;
-                        for (ii = 0; ii < K_H; ii = ii + 1) begin
-                            for (jj = 0; jj < K_W; jj = jj + 1) begin
-                                // input pixel at (ri+ii, cj+jj)
-                                conv1_out[ri][cj] = conv1_out[ri][cj] + $signed({1'b0, in_img[ri+ii][cj+jj]}) * $signed(w_conv1[ii][jj][ch]);
-                            end
-                        end
-                        conv1_out[ri][cj] = conv1_out[ri][cj][23] ? 24'b0 : conv1_out[ri][cj]; // ReLU
-                    end
-                end
+                // compute golden output with result from dut
                 for (ri = 0; ri < OUT2_H; ri = ri + 1) begin
                     for (cj = 0; cj < OUT2_W; cj = cj + 1) begin
                         golden[ri][cj] = 0;
-                        for (ii = 0; ii < K_H; ii = ii + 1) begin
-                            for (jj = 0; jj < K_W; jj = jj + 1) begin
-                                // input pixel at (ri+ii, cj+jj)
-                                golden[ri][cj] = golden[ri][cj] + $signed(conv1_out[ri+ii][cj+jj]) * $signed(w_conv2[ii][jj][ch]);
+                    end
+                end
+                for (ch = 0; ch < CHAN; ch = ch + 1) begin
+                    for (ri = 0; ri < OUT1_H; ri = ri + 1) begin
+                        for (cj = 0; cj < OUT1_W; cj = cj + 1) begin
+                            
+                            conv1_out[ri][cj] = 0;
+                            for (ii = 0; ii < K_H; ii = ii + 1) begin
+                                for (jj = 0; jj < K_W; jj = jj + 1) begin
+                                    // input pixel at (ri+ii, cj+jj)
+                                    conv1_out[ri][cj] = conv1_out[ri][cj] + $signed({1'b0, in_img[ri+ii][cj+jj]}) * $signed(w_conv1[ii][jj][ch]);
+                                end
                             end
-                        end
-                        golden[ri][cj] = golden[ri][cj][23] ? 24'b0 : golden[ri][cj]; // ReLU
-                        if (out_buff[ri][cj] !== golden[ri][cj]) begin
-                            $display("Mismatch ch=%0d pos=(%0d,%0d): DUT=%0d REF=%0d", ch, ri, cj, out_buff[ri][cj], golden[ri][cj]);
-                            mismatches = mismatches + 1;
+                            conv1_out[ri][cj] = conv1_out[ri][cj][23] ? 24'b0 : conv1_out[ri][cj]; // ReLU
                         end
                     end
+                    for (ri = 0; ri < OUT2_H; ri = ri + 1) begin
+                        for (cj = 0; cj < OUT2_W; cj = cj + 1) begin
+                            conv2_out[ri][cj] = 0;
+                            for (ii = 0; ii < K_H; ii = ii + 1) begin
+                                for (jj = 0; jj < K_W; jj = jj + 1) begin
+                                    // input pixel at (ri+ii, cj+jj)
+                                    conv2_out[ri][cj] = conv2_out[ri][cj] + $signed(conv1_out[ri+ii][cj+jj]) * $signed(w_conv2[ii][jj][ch]);
+                                end
+                            end
+                            conv2_out[ri][cj] = conv2_out[ri][cj][23] ? 24'b0 : conv2_out[ri][cj]; // ReLU  
+                        end
+                    end
+                    for (ri = 0; ri < OUT2_H; ri = ri + 1) begin
+                        for (cj = 0; cj < OUT2_W; cj = cj + 1) begin
+                            golden[ri][cj] += conv2_out[ri][cj];
+                        end
+                    end
+                end // channel loop
+                if (out_buff[ri][cj] !== golden[ri][cj]) begin
+                    $display("Mismatch ch=%0d pos=(%0d,%0d): DUT=%0d REF=%0d", ch, ri, cj, out_buff[ri][cj], golden[ri][cj]);
+                    mismatches = mismatches + 1;
                 end
 
                 finished_chan_count = finished_chan_count + 1;

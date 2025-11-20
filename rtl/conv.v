@@ -16,14 +16,17 @@ module conv #(
     input wire signed [7:0] w_conv1 [0:K_H-1][0:K_W-1][0:CHAN-1],
     input wire signed [7:0] w_conv2 [0:K_H-1][0:K_W-1][0:CHAN-1],
     output reg signed [23:0] out_buff [0:OUT2_H-1][0:OUT2_W-1],
-    output reg out_valid,
-    output [3:0] out_chan
+    output reg out_valid
 );
 
 wire signed [23:0] conv1_out [0:OUT1_H-1][0:OUT1_W-1];
 wire signed [23:0] conv2_in [0:OUT1_H-1][0:OUT1_W-1];
 wire conv1_out_valid;
 wire [3:0] conv1_out_chan;
+
+wire signed [23:0] conv2_out_buff [0:OUT2_H-1][0:OUT2_W-1];
+wire conv2_out_valid;
+wire [3:0] conv2_out_chan;
 
 conv1 #(
     .K_H(K_H),
@@ -69,10 +72,24 @@ conv2 #(
     .trigger(conv1_out_valid), // trigger on conv1 valid
     .in_img(conv2_in), // input from conv1 buffer
     .w_conv1(w_conv2), // weights for conv2
-    .out_buff(out_buff), // final output buffer
-    .out_valid(out_valid), // final output valid
+    .out_buff(conv2_out_buff), // final output buffer
+    .out_valid(conv2_out_valid), // final output valid
     .cal_chan(conv1_out_chan),  // final output channel
-    .out_chan(out_chan)
+    .out_chan(conv2_out_chan)
+);
+
+partial_sum #(
+    .DATA_WIDTH(24),
+    .H(OUT2_H),
+    .W(OUT2_W)
+) partial_sum_inst (
+    .clk(clk),
+    .rst_n(rst_n),
+    .in_valid(conv2_out_valid),
+    .cal_chan(conv2_out_chan),
+    .in_data(conv2_out_buff),
+    .out_data(out_buff),
+    .out_valid(out_valid)
 );
 
 endmodule
