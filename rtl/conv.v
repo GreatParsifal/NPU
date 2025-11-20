@@ -21,7 +21,7 @@ module conv #(
 );
 
 wire signed [23:0] conv1_out [0:OUT1_H-1][0:OUT1_W-1];
-wire signed [23:0] conv2_in [0:OUT2_H-1][0:OUT2_W-1];
+wire signed [23:0] conv2_in [0:OUT1_H-1][0:OUT1_W-1];
 wire conv1_out_valid;
 wire [3:0] conv1_out_chan;
 

@@ -30,7 +30,11 @@ reg [3:0] cal_chan;
 reg [7:0] conv_win [0:K_H-1][0:K_W-1];
 reg signed [7:0] w [0:K_H-1][0:K_W-1];
 
-conv_unit dut (
+conv_unit #(
+    .K_H(K_H),
+    .K_W(K_W),
+    .DATA_WIDTH(9)
+) dut (
     .conv_win(conv_win),
     .w(w),
     .result(out_pixel)
@@ -43,7 +47,7 @@ task update_conv_opr;
     begin
         for (i=0;i<K_H;i=i+1) begin
             for (j=0;j<K_W;j=j+1) begin
-                conv_win[i][j] <= in_img[i + (addr/OUT_W)][j + addr % OUT_W];
+                conv_win[i][j] <= {1'b0, in_img[i + (addr/OUT_W)][j + addr % OUT_W]};
                 w[i][j] <= w_conv1[i][j][chan];
             end
         end

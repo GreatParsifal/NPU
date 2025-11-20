@@ -1,8 +1,9 @@
 module conv_unit # (
     parameter K_H = 3,
-    parameter K_W = 3
+    parameter K_W = 3,
+    parameter DATA_WIDTH = 9
 )(
-    input [7:0] conv_win [K_H-1:0][K_W-1:0],
+    input [DATA_WIDTH-1:0] conv_win [K_H-1:0][K_W-1:0],
     input signed [7:0] w [K_H-1:0][K_W-1:0],
     output reg signed [23:0] result
 );
@@ -18,7 +19,7 @@ generate
         for (gj = 0; gj < K_W; gj = gj + 1) begin : GEN_COL
             // compute linear index for the product array
             localparam integer IDX = gi * K_W + gj;
-            assign prod[IDX] = $signed({1'b0, conv_win[gi][gj]}) * $signed(w[gi][gj]);
+            assign prod[IDX] = $signed(conv_win[gi][gj]) * $signed(w[gi][gj]);
         end
     end
 endgenerate

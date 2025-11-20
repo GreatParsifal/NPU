@@ -27,10 +27,14 @@ reg [7:0] cal_addr;
 reg [7:0] save_addr;
 reg [23:0] out_pixel;
 
-reg [7:0] conv_win [0:K_H-1][0:K_W-1];
+reg [23:0] conv_win [0:K_H-1][0:K_W-1];
 reg signed [7:0] w [0:K_H-1][0:K_W-1];
 
-conv_unit dut (
+conv_unit # (
+    .K_H(K_H),
+    .K_W(K_W),
+    .DATA_WIDTH(24)
+) dut2 (
     .conv_win(conv_win),
     .w(w),
     .result(out_pixel)
@@ -85,12 +89,7 @@ always @ (posedge clk) begin
             out_buff[cal_addr / OUT_W][cal_addr % OUT_W] <= out_pixel;
             out_valid <= 1;
             out_chan <= cal_chan;
-            if (cal_chan == CHAN-1) state <= S_IDLE;
-            else begin
-                state <= S_CALC;
-                cal_addr <= 8'b0;
-                // cal_chan <= cal_chan + 4'b1;
-            end
+            state <= S_IDLE;
         end
         default: state <= S_IDLE;
     endcase
