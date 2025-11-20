@@ -22,91 +22,76 @@
 //         12'd2: require
 //======================================================================
 `timescale 1ns/1ps
-`include "conv1.v"
-`include "conv2.v"
+`include "conv.v"
 `include "fcn.v"
 
 module npu #(
     // Dimension limits
-    parameter IN1_H = 16,
-    parameter IN1_W = 15
+    K_H = 3,
+    K_W = 3,
+    IN1_H = 16,
+    IN1_W = 15,
+    OUT1_H = 14,
+    OUT1_W = 13,
+    OUT2_H = 12,
+    OUT2_W = 11,
+    CHAN = 10
 )(
-    input wire clk,
-    input wire rst,
-    input wire en, //enable signal
-    input wire [14:0] addr,
-    input wire [31:0] r_data,
-    input wire [31:0] w_data
+    input logic clk,
+    input logic rst_ni,
+    input logic ena,
+    input logic wea,
+    input logic [15:0] addra,
+    input logic [31:0] dina,
+    input logic [31:0] douta
 );
 
-    //buffers and sizes
-    localparam int IMG_SIZE  = IN1_H*IN1_W;     // 16*15 = 240
-    localparam int WC1_SIZE  = 3*3*10;          // 90
-    localparam int WC2_SIZE  = 3*3*10;          // 90
-    localparam int WF1_SIZE  = 132*10;          // 1320
-    localparam int WF2_SIZE  = 10;              // 10
+    wire rst = ~rst_ni;
+    
+    localparam int IMG_SIZE = INCONV_H*INCONV_W;   // 240
+    localparam int WC_SIZE  = 3*3*CHAN;            // 90
+    localparam int FV_LEN   = OUTCONV_H*OUTCONV_W; // 132
+    localparam int FC1_WLEN = FV_LEN*CHAN;         // 132*10 = 1320
+    localparam int FC2_WLEN = CHAN;                // 10
 
-    reg [7:0] img_in [0:IMG_SIZE-1];                       // 16x15
-    reg signed [7:0] w_conv1 [0:WC1_SIZE-1];               // 3x3x1x10
-    reg signed [7:0] w_conv2 [0:WC2_SIZE-1];               // 3x3x10x1
-    reg signed [7:0] w_fc1 [0:WF1_SIZE-1];                 // 132x10
-    reg signed [7:0] w_fc2 [0:WF2_SIZE-1];                 // 10x1
+    logic                conv_start, conv_done;
+    logic signed [7:0]   conv_out  [0:FV_LEN-1];   // 132
 
-    // Buffers between stages
-    // conv1: 14x13x10 = 1820
-    wire signed [7:0] conv1_out_w [0:(16-3+1)*(15-3+1)*10-1];
-    wire done_c1;
+    conv u_conv (
+        .clk       (clk),
+        .rst_n     (~rst),
+        .trigger   (conv_start),
+        .in_img    (img_in),
+        .w_conv1   (w_conv1),
+        .w_conv2   (w_conv2),
+        .out_buff  (conv_out),
+        .out_valid (conv_done)
+    );
 
-    // conv2: 12x11x1 = 132
-    wire signed [7:0] conv2_out_w [0:(14-3+1)*(13-3+1)-1];
-    wire done_c2;
+    logic  signed [7:0] in_vec_array [0:FV_LEN-1];
+    logic  signed [7:0] fc1_w_array  [0:CHAN-1][0:FV_LEN-1];
+    logic  signed [7:0] fc2_w_array  [0:CHAN-1];
+    logic  signed [7:0] img_in       [0:IN1_H-1][0:IN1_W-1];
+    logic  signed [7:0] w_conv1      [0:K_H-1][0:K_W-1][0:CHAN-1];
+    logic  signed [7:0] w_conv2      [0:K_H-1][0:K_W-1][0:CHAN-1];
+    logic  signed [7:0] conv_out     [0:OUT2_H-1][0:OUT2_W-1];
 
-    // fcn (FC1+FC2 合并)
-    // 来自 conv2 的 132 维输入向量
-    wire  signed [7:0] in_vec_array [0:132-1];
-    // FC1 权重二维数组（神经元主序 [neuron][k]）
-    wire  signed [7:0] fc1_w_array [0:10-1][0:132-1];
-    // FC2 权重一维数组
-    wire  signed [7:0] fc2_w_array [0:10-1];
-
-    // 
     genvar gi, gj;
     generate
-        for (gi = 0; gi < 132; gi = gi + 1) begin : GEN_IN_VEC
-            assign in_vec_array[gi] = conv2_out_w[gi];
+        for (gi = 0; gi < FV_LEN; gi++) begin : GEN_INVEC
+            assign in_vec_array[gi] = conv_out[gi];
         end
-        for (gi = 0; gi < 10; gi = gi + 1) begin : GEN_W_FC1_ROW
-            for (gj = 0; gj < 132; gj = gj + 1) begin : GEN_W_FC1_COL
-                assign fc1_w_array[gi][gj] = w_fc1[gi*132 + gj];
-            end
+        for (gi = 0; gi < CHAN; gi++) begin : GEN_FC_W
             assign fc2_w_array[gi] = w_fc2[gi];
+            for (gj = 0; gj < FV_LEN; gj++) begin : GEN_FC1_W
+                assign fc1_w_array[gi][gj] = w_fc1[gi*FV_LEN + gj];
+            end
         end
     endgenerate
 
-    // Stage start strobes
-    reg start_c1, start_c2, start_fc1, start_fc2;
+    logic in_vec_wr, fc1_w_wr_all, fc2_w_wr_all, fcn_start, fcn_done;
+    logic signed [23:0] fcn_logit;
 
-    conv1 u_c1 (
-        .clk(clk), .rst(rst), .start(start_c1),
-        .in_img(img_in), .weights(w_conv1),
-        .done(done_c1), .out_feat(conv1_out_w)
-    );
-
-    conv2 u_c2 (
-        .clk(clk), .rst(rst), .start(start_c2),
-        .in_feat(conv1_out_w), .weights(w_conv2),
-        .done(done_c2), .out_feat(conv2_out_w)
-    );
-
-    // FCN 控制脉冲
-    reg in_vec_wr;
-    reg fc1_w_wr_all;
-    reg fc2_w_wr_all;
-    reg fcn_start;
-    wire fcn_done;
-    wire signed [23:0] fcn_logit;
-
-    // 实例化 fcn（使用并行数组一次性写入接口）
     fcn u_fcn (
         .clk            (clk),
         .rst_n          (~rst),
@@ -121,122 +106,96 @@ module npu #(
         .fc2_logit      (fcn_logit)
     );
 
-    //addr decoding and data writing
-    wire [2:0] sel = addr[14:12];
+    wire [2:0]  sel = addr[14:12];
     wire [11:0] idx = addr[11:0];
 
-    // 控制寄存器：通过 addr=101:1 触发一次完整流水
-    reg ctrl_start;
+    logic ctrl_start;
 
-    always @(posedge clk) begin
-        if (rst) begin
-            ctrl_start <= 1'b0;
-        end else if (en) begin
-        case(sel)
-            3'b000: if (en) img_in[idx] <= w_data[7:0]; // input image
-            3'b001: if (en) w_conv1[idx] <= w_data[7:0]; // conv1 weights
-            3'b010: if (en) w_conv2[idx] <= w_data[7:0]; // conv2 weights
-            3'b011: if (en) w_fc1[idx]   <= w_data[7:0]; // fc1 weights
-            3'b100: if (en) w_fc2[idx]   <= w_data[7:0]; // fc2 weights
-            3'b101: begin
-                case(idx)
-                    12'd0: if (en) ctrl_start <= 1'b0; // rst control flags only
-                    12'd1: ctrl_start <= 1'b1;         // trigger start pulse (由状态机消费并清零)
-                    12'd2: begin
-                        // require output logic if needed
+    always_ff @(posedge clk or posedge rst) begin
+       if (ena && wea) begin
+            unique case (sel)
+                3'b000: begin
+                    if (idx < IN1_N/4) begin
+                        in_vec[idx*4 + 0] <= dina[7:0];
+                        in_vec[idx*4 + 1] <= dina[15:8];
+                        in_vec[idx*4 + 2] <= dina[23:16];
+                        in_vec[idx*4 + 3] <= dina[31:24];
                     end
-                    default: ;
-                endcase
-            end
-        endcase
-        end
-    end
+                end
+                3'b011: begin // fc1_w linear -> flat array                  
+                    if (idx*4 < FC1_TOTAL) begin
+                        if (idx*4 + 0 < FC1_TOTAL) fc1_w_flat[idx*4 + 0] <= dina[7:0];
+                        if (idx*4 + 1 < FC1_TOTAL) fc1_w_flat[idx*4 + 1] <= dina[15:8];
+                        if (idx*4 + 2 < FC1_TOTAL) fc1_w_flat[idx*4 + 2] <= dina[23:16];
+                        if (idx*4 + 3 < FC1_TOTAL) fc1_w_flat[idx*4 + 3] <= dina[31:24];
+                    end
+                end
+                3'b100: begin
                     
-    // 装载/计算状态机：conv1 -> conv2 -> 一拍装载 fcn -> 运行 fcn
-    localparam P_IDLE       = 4'd0,
-               P_C1         = 4'd1,
-               P_C2         = 4'd2,
-               P_LOAD_FC1W  = 4'd3,
-               P_LOAD_FC2W  = 4'd4,
-               P_LOAD_IN    = 4'd5,
-               P_FCN_START  = 4'd6,
-               P_FCN_WAIT   = 4'd7,
-               P_DONE       = 4'd8;
-
-    reg [3:0] p_state;
-    reg signed [23:0] result_logit;
-
-    always @(posedge clk) begin
-        if (rst) begin
-            p_state      <= P_IDLE;
-            start_c1     <= 1'b0;
-            start_c2     <= 1'b0;
-            in_vec_wr    <= 1'b0;
-            fc1_w_wr_all <= 1'b0;
-            fc2_w_wr_all <= 1'b0;
-            fcn_start    <= 1'b0;
-            result_logit <= 24'sd0;
-        end else begin
-            // 默认拉低一次性脉冲
-            start_c1     <= 1'b0;
-            start_c2     <= 1'b0;
-            in_vec_wr    <= 1'b0;
-            fc1_w_wr_all <= 1'b0;
-            fc2_w_wr_all <= 1'b0;
-            fcn_start    <= 1'b0;
-
-            case (p_state)
-                P_IDLE: begin
-                    if (ctrl_start) begin
-                        start_c1 <= 1'b1;  // 触发 conv1
-                        p_state  <= P_C1;
-                        // 消费触发
-                        ctrl_start <= 1'b0;
+                    if (idx*4 < OUT1_M) begin
+                        if (idx*4 + 0 < OUT1_M) fc2_w[idx*4 + 0] <= dina[7:0];
+                        if (idx*4 + 1 < OUT1_M) fc2_w[idx*4 + 1] <= dina[15:8];
+                        if (idx*4 + 2 < OUT1_M) fc2_w[idx*4 + 2] <= dina[23:16];
+                        if (idx*4 + 3 < OUT1_M) fc2_w[idx*4 + 3] <= dina[31:24];
                     end
                 end
-                P_C1: begin
-                    if (done_c1) begin
-                        start_c2 <= 1'b1;  // 触发 conv2
-                        p_state  <= P_C2;
-                    end
+                3'b101: begin
+                    if (idx == 12'd1) ctrl_start <= 1'b1; // trigger
                 end
-                P_C2: begin
-                    if (done_c2) begin
-                        // 一拍装载 FC1 权重
-                        fc1_w_wr_all <= 1'b1;
-                        p_state      <= P_LOAD_FC2W;
-                    end
-                end
-                P_LOAD_FC2W: begin
-                    // 紧接着一拍装载 FC2 权重
-                    fc2_w_wr_all <= 1'b1;
-                    p_state      <= P_LOAD_IN;
-                end
-                P_LOAD_IN: begin
-                    // 一拍装载输入向量
-                    in_vec_wr <= 1'b1;
-                    p_state   <= P_FCN_START;
-                end
-                P_FCN_START: begin
-                    fcn_start <= 1'b1;  // 发起 FCN 计算
-                    p_state   <= P_FCN_WAIT;
-                end
-                P_FCN_WAIT: begin
-                    if (fcn_done) begin
-                        result_logit <= fcn_logit;
-                        p_state      <= P_DONE;
-                    end
-                end
-                P_DONE: begin
-                    // 保持结果，等待下一次 ctrl_start
-                    if (ctrl_start) begin
-                        start_c1 <= 1'b1;
-                        p_state  <= P_C1;
-                        ctrl_start <= 1'b0;
-                    end
-                end
-                default: p_state <= P_IDLE;
+                default: ;
             endcase
         end
+        if(state == S_RUN_CONV) begin
+            ctrl_start <= 1'b0;
+        end
     end
+    typedef enum logic [2:0] {
+        S_IDLE, S_RUN_CONV, S_LOAD_ALL, S_FCN_START, S_FCN_WAIT, S_DONE
+    }state_e;
+
+    state_e st;
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            st            <= S_IDLE;
+            conv_start    <= 1'b0;
+            in_vec_wr     <= 1'b0;
+            fc1_w_wr_all  <= 1'b0;
+            fc2_w_wr_all  <= 1'b0;
+            fcn_start     <= 1'b0;
+        end else begin
+      
+        conv_start    <= 1'b0;
+        in_vec_wr     <= 1'b0;
+        fc1_w_wr_all  <= 1'b0;
+        fc2_w_wr_all  <= 1'b0;
+        fcn_start     <= 1'b0;
+
+        unique case (st)
+          S_IDLE: if (ctrl_start) begin
+            conv_start <= 1'b1;     // 触发 conv
+            st         <= S_RUN_CONV;
+            ctrl_start <= 1'b0;     
+        end
+          S_RUN_CONV: if (conv_done) begin
+            in_vec_wr     <= 1'b1;
+            fc1_w_wr_all  <= 1'b1;
+            fc2_w_wr_all  <= 1'b1;
+            st            <= S_LOAD_ALL;
+        end
+          S_LOAD_ALL: begin
+            fcn_start <= 1'b1;      // 下一拍启动 fcn
+            st            <= S_FCN_WAIT;
+        end
+        S_FCN_WAIT: if (fcn_done) begin
+            st <= S_DONE;
+        end
+        S_DONE: if(~we)begin
+          douta <= {8'sd0, fcn_logit};
+          st <= S_IDLE;
+        end
+        default: st <= S_IDLE;
+      endcase
+    end
+  end
 endmodule

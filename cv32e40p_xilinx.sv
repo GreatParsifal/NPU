@@ -59,12 +59,12 @@ module cv32e40p_xilinx (
         .AXI_DATA_WIDTH ( 32    ),
         .AXI_ID_WIDTH   ( 4     ),
         .AXI_USER_WIDTH ( 1     )
-    ) master[3:0]();//new slave: accelerator
+    ) master[4:0]();//new slave: accelerator
 
     
     localparam axi_pkg::xbar_cfg_t AXI_XBAR_CFG = '{
         NoSlvPorts:         3,
-        NoMstPorts:         4, // new slave: accelerator
+        NoMstPorts:         5, // new slave: accelerator
         MaxMstTrans:        1, // Probably requires update
         MaxSlvTrans:        1, // Probably requires update
         FallThrough:        1'b0,
@@ -74,27 +74,32 @@ module cv32e40p_xilinx (
         UniqueIds:          1'b0,
         AxiAddrWidth:       32,
         AxiDataWidth:       32,
-        NoAddrRules:        4  // new slave: accelerator
+        NoAddrRules:        5  // new slave: accelerator
     };
 
-    axi_pkg::xbar_rule_32_t [3:0] addr_map;
+    axi_pkg::xbar_rule_32_t [4:0] addr_map;
 
     localparam idx_rom      = 0;
     localparam idx_sram     = 1;
 
     localparam idx_acc      = 3;// new slave: accelerator
+    localparam idx_dsram       = 4;
     localparam rom_base     = 32'h00010000;
     localparam rom_length   = 32'h00010000;
     localparam sram_base    = 32'h80000000;
     localparam sram_length  = 32'h10000000;
     localparam acc_base     = 32'h70000000;// new slave: accelerator
     localparam acc_length   = 32'h10000000;// new slave: accelerator
+    // new dcache sram window: 8KB
+    localparam dsram_base   = 32'h6000_0000;
+    localparam dsram_length = 32'h00002000; // 8KB
 
     assign addr_map = '{
         '{ idx: idx_rom,       start_addr: rom_base,        end_addr: rom_base + rom_length   },
         '{ idx: idx_sram,      start_addr: sram_base,       end_addr: sram_base + sram_length },
         '{ idx: 2,             start_addr: 32'h0000_0000,   end_addr: 32'h00001000            },
-        '{ idx: idx_acc,      start_addr: acc_base,       end_addr: acc_base + acc_length }
+        '{ idx: idx_acc,       start_addr: acc_base,       end_addr: acc_base + acc_length },
+        '{ idx: idx_dsram,     start_addr: dsram_base,     end_addr: dsram_base + dsram_length}
     };
 
     axi_xbar_intf #(
@@ -456,7 +461,7 @@ module cv32e40p_xilinx (
 	logic [31:0]    sram_wdata;
 	logic [3:0]     sram_be;
 	logic [31:0]    sram_rdata;
-        logic sram_reg;
+    logic sram_reg;
  	//logic [2:0]		sram_req_bank;
 	//logic [2:0][31:0] sram_rdata_bank;
 	//logic [1:0]		sram_bank_buf;
@@ -526,6 +531,59 @@ module cv32e40p_xilinx (
         .data_i ( sram_rdata        )
     );
 
+    // ---------------- new dcache SRAM ----------------
+    logic           dsram_req;
+    logic           dsram_we;
+    logic [31:0]    dsram_addr;
+    logic [31:0]    dsram_wdata;
+    logic [3:0]     dsram_be;
+    logic [31:0]    dsram_rdata;
+
+`ifdef SIM
+    // 仿真版 8KB（AddrWidth=11 -> 2048 words x 4B = 8KB）
+    sram_ff #(
+        .AddrWidth(11),
+        .DataWidth(32)
+    ) sram_ff_d (
+        .clk_i  ( clk_i                    ),
+        .req_i  ( 1'b1                     ),
+        .wen_i  ( dsram_be & {4{dsram_we}} ),
+        .addr_i ( dsram_addr[12:2]         ),
+        .data_i ( dsram_wdata              ),
+        .data_o ( dsram_rdata              )
+    );
+`else
+    // 工艺 SRAM 宏（占位，按项目替换）
+    TS1DA32KX32 sram_ff_d (
+        .CLK ( clk_i            ),
+        .A   ( dsram_addr[16:2] ),
+        .CEB ( ~dsram_req       ),
+        .OEB ( 1'b0             ),
+        .GWEB( 1'b1             ),
+        .BWEB( ~dsram_we        ),
+        .BWB ( ~dsram_be        ),
+        .DIN ( dsram_wdata      ),
+        .DOUT( dsram_rdata      )
+    );
+`endif
+
+    axi2mem #(
+        .AXI_ID_WIDTH   ( 4     ),
+        .AXI_ADDR_WIDTH ( 32    ),
+        .AXI_DATA_WIDTH ( 32    ),
+        .AXI_USER_WIDTH ( 1     )
+    ) i_axi2dsram (
+        .clk_i  ( clk_i               ),
+        .rst_ni ( ndmreset_n          ),
+        .slave  ( master[idx_dsram]   ),
+        .req_o  ( dsram_req           ),
+        .we_o   ( dsram_we            ),
+        .addr_o ( dsram_addr          ),
+        .be_o   ( dsram_be            ),
+        .data_o ( dsram_wdata         ),
+        .data_i ( dsram_rdata         )
+    );
+
     logic           acc_req;
     logic           acc_we;
     logic [31:0]    acc_addr;
@@ -535,8 +593,8 @@ module cv32e40p_xilinx (
     npu i_acc (
         .clk   (clk_i              ),
         .ena    (acc_req           ),
-        .wea    (acc_we   ),
-        .addra  (acc_addr[12:2]    ),
+        .wea    (acc_we            ),
+        .addra  (acc_addr[15:0]    ),
         .dina   (acc_wdata         ),
         .douta  (acc_rdata         ),
         .rst_ni (ndmreset_n        )
@@ -599,184 +657,4 @@ module cv32e40p_xilinx (
         end
     end
 endmodule
-//     101: other operations (trigger, rst, require ...)
-// addr[11:0] represents:
-//     address of weight or iamge pixel when addr[14:12] < 3'b101;
-//     type of operation when addr[14:12] == 3'b101.
-//         12'd0: rst
-//         12'd1: trigger
-//         12'd2: require
-//======================================================================
-`timescale 1ns/1ps
-`include "conv1.v"
-`include "conv2.v"
-`include "fc1.v"
-`include "fc_layer2.v"
 
-module npu_top #(
-    // Dimension limits
-    parameter IN1_H = 16,
-    parameter IN1_W = 15
-)(
-    input wire clk,
-    input wire rst,
-    input wire en, //enable signal
-    input wire [14:0] addr,
-    input wire [31:0] r_data,
-    input wire [31:0] w_data
-);
-    // States
-    localparam S_IDLE = 3'd0,
-               S_C1   = 3'd1,
-               S_C2   = 3'd2,
-               S_FC1  = 3'd3,
-               S_FC2  = 3'd4,
-               S_DONE = 3'd5;
-
-    reg [2:0] state;
-
-    //buffers and sizes
-    localparam int IMG_SIZE  = IN1_H*IN1_W;     // 16*15 = 240
-    localparam int WC1_SIZE  = 3*3*10;          // 90
-    localparam int WC2_SIZE  = 3*3*10;          // 90
-    localparam int WF1_SIZE  = 132*10;          // 1320
-    localparam int WF2_SIZE  = 10;              // 10
-
-    reg [7:0] img_in [0:IMG_SIZE-1];                       // 16x15
-    reg signed [7:0] w_conv1 [0:WC1_SIZE-1];               // 3x3x1x10
-    reg signed [7:0] w_conv2 [0:WC2_SIZE-1];               // 3x3x10x1
-    reg signed [7:0] w_fc1 [0:WF1_SIZE-1];                 // 132x10
-    reg signed [7:0] w_fc2 [0:WF2_SIZE-1];                 // 10x1
-
-    // Buffers between stages
-    // conv1: 14x13x10 = 1820
-    wire signed [7:0] conv1_out_w [0:(16-3+1)*(15-3+1)*10-1];
-    wire done_c1;
-
-    // conv2: 12x11x1 = 132
-    wire signed [7:0] conv2_out_w [0:(14-3+1)*(13-3+1)-1];
-    wire done_c2;
-
-    // fc1: 132->10
-    wire signed [7:0] fc1_out_w [0:9];
-    wire done_fc1;
-
-    // fc2: 10->1
-    wire done_fc2;
-    wire signed [23:0] fc2_res;
-
-    // Stage start strobes
-    reg start_c1, start_c2, start_fc1, start_fc2;
-
-    conv1 u_c1 (
-        .clk(clk), .rst(rst), .start(start_c1),
-        .in_img(img_in), .weights(w_conv1),
-        .done(done_c1), .out_feat(conv1_out_w)
-    );
-
-    conv2 u_c2 (
-        .clk(clk), .rst(rst), .start(start_c2),
-        .in_feat(conv1_out_w), .weights(w_conv2),
-        .done(done_c2), .out_feat(conv2_out_w)
-    );
-
-    fc1 u_fc1 (
-        .clk(clk), .rst(rst), .start(start_fc1),
-        .in_vec(conv2_out_w), .weights(w_fc1),
-        .done(done_fc1), .out_vec(fc1_out_w)
-    );
-
-    fc_layer2_systolic u_fc2 (
-        .clk(clk), .rst(rst), .start(start_fc2),
-        .input_vec(fc1_out_w), .weight_vec(w_fc2),
-        .done(done_fc2), .result(fc2_res)
-    );
-
-    //addr decoding and data writing
-    wire [2:0] sel = addr[14:12];
-    wire [11:0] idx = addr[11:0];
-
-    always @(posedge clk) begin
-        if (rst) begin
-            
-        end else if (en) begin
-        case(sel)
-            3'b000: if (en) img_in[idx] <= w_data[7:0]; // input image
-            3'b001: if (en) w_conv1[idx] <= w_data[7:0]; // conv1 weights
-            3'b010: if (en) w_conv2[idx] <= w_data[7:0]; // conv2 weights
-            3'b011: if (en) w_fc1[idx]   <= w_data[7:0]; // fc1 weights
-            3'b100: if (en) w_fc2[idx]   <= w_data[7:0]; // fc2 weights
-            3'b101: begin
-                case(idx)
-                    12'd0: if (en) begin
-                        start_c1 <= 1'b0;
-                        start_c2 <= 1'b0;
-                        start_fc1 <= 1'b0;
-                        start_fc2 <= 1'b0;
-                    end
-                    12'd1: begin
-                        start_c1 <= 1'b1; // trigger start
-                    end
-                    12'd2: begin
-                        // require output logic if needed
-                    end
-                    default: ;
-                endcase
-            end else begin
-                start_c1 <= 1'b0;
-                start_c2 <= 1'b0;
-                start_fc1 <= 1'b0;
-                start_fc2 <= 1'b0;
-            end
-        endcase
-        end
-    end
-                    
-    always @(posedge clk) begin
-        if (rst) begin
-            state <= S_IDLE; done <= 1'b0; out <= 24'sd0;
-            start_c1 <= 1'b0; start_c2 <= 1'b0; start_fc1 <= 1'b0; start_fc2 <= 1'b0;
-        end else begin
-            // default strobes low
-            start_c1 <= 1'b0; start_c2 <= 1'b0; start_fc1 <= 1'b0; start_fc2 <= 1'b0;
-            done <= 1'b0;
-            case (state)
-                S_IDLE: begin
-                    if (start) begin
-                        start_c1 <= 1'b1;
-                        state <= S_C1;
-                    end
-                end
-                S_C1: begin
-                    if (done_c1) begin
-                        start_c2 <= 1'b1;
-                        state <= S_C2;
-                    end
-                end
-                S_C2: begin
-                    if (done_c2) begin
-                        start_fc1 <= 1'b1;
-                        state <= S_FC1;
-                    end
-                end
-                S_FC1: begin
-                    if (done_fc1) begin
-                        start_fc2 <= 1'b1;
-                        state <= S_FC2;
-                    end
-                end
-                S_FC2: begin
-                    if (done_fc2) begin
-                        out <= fc2_res;
-                        state <= S_DONE;
-                    end
-                end
-                S_DONE: begin
-                    done <= 1'b1;
-                    if (!en) state <= S_IDLE;
-                end
-                default: state <= S_IDLE;
-            endcase
-        end
-    end
-endmodule
