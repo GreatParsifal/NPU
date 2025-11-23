@@ -1,5 +1,5 @@
 // fcn.v
-`include "pe_unit_fcn.v"
+
 
 module fcn #(
     parameter int IN1_N  = 132,
@@ -10,13 +10,13 @@ module fcn #(
 
     // write ports
     input  in_vec_wr,               // write input
-    input  wire [7:0]  in_vec_array [0:IN1_N-1],    // [0] .. [IN1_N-1]
+    input  logic [7:0]  in_vec_array [0:IN1_N-1],    // [0] .. [IN1_N-1]
 
     input  fc1_w_wr_all,            // write entire fc1 weight matrix in one cycle
-    input  wire  signed [7:0] fc1_w_array  [0:OUT1_M-1][0:IN1_N-1], // neuron-major: [neuron][weight_idx]
+    input  logic  signed [7:0] fc1_w_array  [0:OUT1_M-1][0:IN1_N-1], // neuron-major: [neuron][weight_idx]
 
     input  fc2_w_wr_all,            // write entire fc2 weight vector in one cycle
-    input  wire  signed [7:0] fc2_w_array  [0:OUT1_M-1],   // fc2_w_array[0..OUT1_M-1]
+    input  logic  signed [7:0] fc2_w_array  [0:OUT1_M-1],   // fc2_w_array[0..OUT1_M-1]
 
     // control and outputs
     input  start,
@@ -30,7 +30,7 @@ module fcn #(
     reg signed [7:0] fc2_w   [0:OUT1_M-1];
 
     // PEs and helpers
-    wire signed [23:0] pe_out [0:OUT1_M-1];
+    logic signed [23:0] pe_out [0:OUT1_M-1];
     reg clr_all;
     reg ready_all;
     reg signed [7:0] current_x;
