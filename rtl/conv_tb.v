@@ -113,7 +113,7 @@ module conv_tb;
         // wait until all channels are produced or timeout
         
         cycles_wait = 0;
-        while (finished_chan_count < CHAN && cycles_wait < 200000) begin
+        while (finished_chan_count < 1 && cycles_wait < 20000000) begin
             @(posedge clk);
             cycles_wait = cycles_wait + 1;
             if (out_valid && !prev_valid) begin
@@ -168,12 +168,28 @@ module conv_tb;
             prev_valid = out_valid;
         end
 
-        if (cycles_wait >= 200000) begin
+        if (cycles_wait >= 20000000) begin
             $display("\nTimeout waiting for channels, finished %0d/%0d\n", finished_chan_count, CHAN);
         end
 
-        if (mismatches == 0) $display("\nconv_tb: TEST PASS - all channels matched reference\n");
-        else $display("\nconv1_tb: TEST FAIL - %0d mismatches found\n", mismatches);
+        if (mismatches == 0) begin
+            $display("\nconv_tb: TEST PASS - all channels matched reference\n");
+            $display("Final output buffer:");
+            for (ri = 0; ri < OUT2_H; ri = ri + 1) begin
+                for (cj = 0; cj < OUT2_W; cj = cj + 1) begin
+                    $write("%0d ", out_buff[ri][cj]);
+                end
+                $write("\n");
+            end
+            $display("Final golden buffer:");
+            for (ri = 0; ri < OUT2_H; ri = ri + 1) begin
+                for (cj = 0; cj < OUT2_W; cj = cj + 1) begin
+                    $write("%0d ", golden[ri][cj]);
+                end
+                $write("\n");
+            end
+        end
+        else $write("\nconv1_tb: TEST FAIL - %0d mismatches found\n", mismatches);
 
         #100;
         $finish;

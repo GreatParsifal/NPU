@@ -40,11 +40,14 @@ always @ (posedge clk) begin
             end
             CALC: begin
                 for (i = 0; i < H; i = i + 1) begin
-                    out_data[i][j] <= 0;
+                    out_data[i][j] <= out_data[i][j] + in_data[i][j];
                 end
                 j += 1;
                 if (j == W) begin
                     state <= DONE;
+                    for (i = 0; i < H; i = i + 1) begin
+                        out_data[i][j] <= out_data[i][j][DATA_WIDTH-1] ? 0 : out_data[i][j]; // ReLU
+                    end
                 end
             end
             DONE: begin

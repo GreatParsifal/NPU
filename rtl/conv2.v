@@ -30,7 +30,7 @@ reg [23:0] out_pixel;
 reg [23:0] conv_win [0:K_H-1][0:K_W-1];
 reg signed [7:0] w [0:K_H-1][0:K_W-1];
 
-conv_unit # (
+conv_unit2 # (
     .K_H(K_H),
     .K_W(K_W),
     .DATA_WIDTH(24)
