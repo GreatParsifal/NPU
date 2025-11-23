@@ -149,12 +149,16 @@ module conv_tb;
                                     conv2_out[ri][cj] = conv2_out[ri][cj] + $signed(conv1_out[ri+ii][cj+jj]) * $signed(w_conv2[ii][jj][ch]);
                                 end
                             end
-                            conv2_out[ri][cj] = conv2_out[ri][cj][23] ? 24'b0 : conv2_out[ri][cj]; // ReLU  
                         end
                     end
                     for (ri = 0; ri < OUT2_H; ri = ri + 1) begin
                         for (cj = 0; cj < OUT2_W; cj = cj + 1) begin
                             golden[ri][cj] += conv2_out[ri][cj];
+                        end
+                    end
+                    for (ri = 0; ri < OUT2_H; ri = ri + 1) begin
+                        for (cj = 0; cj < OUT2_W; cj = cj + 1) begin
+                            golden[ri][cj] = golden[ri][cj][23] ? 24'b0 : golden[ri][cj]; // ReLU
                         end
                     end
                 end // channel loop
