@@ -12,7 +12,7 @@ module partial_sum #(
     output reg out_valid
 );
 
-integer i, j;
+integer i, j, k;
 localparam IDLE = 0,
            CALC = 1,
            DONE = 2;
@@ -22,16 +22,15 @@ always @ (posedge clk) begin
     if (~rst_n) begin
         state <= IDLE;
         out_valid <= 0;
-        for (i = 0; i < H; i = i + 1) begin
-            for (j = 0; j < W; j = j + 1) begin
-                out_data[i][j] <= 0;
+        for (i <= 0; i < H; i = i + 1) begin
+            for (k <= 0; k < W; k = k + 1) begin
+                out_data[i][k] <= 0;
             end
         end
     end
     else begin
         case(state) 
             IDLE: begin
-                i <= 0;
                 j <= 0;
                 out_valid <= 0;
                 if (in_valid) begin
@@ -39,14 +38,19 @@ always @ (posedge clk) begin
                 end
             end
             CALC: begin
-                for (i = 0; i < H; i = i + 1) begin
-                    out_data[i][j] <= out_data[i][j] + in_data[i][j];
-                end
-                j += 1;
-                if (j == W) begin
-                    state <= DONE;
+                if (j < W-1) begin
                     for (i = 0; i < H; i = i + 1) begin
-                        out_data[i][j] <= out_data[i][j][DATA_WIDTH-1] ? 0 : out_data[i][j]; // ReLU
+                        out_data[i][j] <= out_data[i][j] + in_data[i][j];
+                    end
+                    j <= j + 1;
+                end else begin
+                    state <= DONE;
+                    for (i <= 0; i < H; i <= i + 1) begin
+                        if ({out_data[i][j] + in_data[i][j]}[23] == 1) begin
+                            out_data[i][j] <= 24'sd0;
+                        end else begin
+                            out_data[i][j] <= out_data[i][j] + in_data[i][j];
+                        end
                     end
                 end
             end
