@@ -27,7 +27,7 @@ reg [7:0] save_addr;
 reg [23:0] out_pixel;
 reg [3:0] cal_chan;
 
-reg [7:0] conv_win [0:K_H-1][0:K_W-1];
+reg [8:0] conv_win [0:K_H-1][0:K_W-1];
 reg signed [7:0] w [0:K_H-1][0:K_W-1];
 
 conv_unit #(
