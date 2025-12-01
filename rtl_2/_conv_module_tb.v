@@ -23,7 +23,7 @@ module conv_tb;
     // DUT 输出
     wire valid;
     wire done;
-    wire signed [DATA_WIDTH-1:0] out_pixel;
+    wire signed [23:0] out_pixel;
     wire [7:0] addr;
 
     // 实例化 DUT（端口名与模块一致）
@@ -55,7 +55,7 @@ module conv_tb;
     integer row, col;
     integer cycles;
     reg signed [31:0] acc;
-    reg signed [DATA_WIDTH-1:0] expected;
+    reg signed [23:0] expected;
     reg detected_done;
 
     initial begin
@@ -73,7 +73,8 @@ module conv_tb;
         // 填充输入图像（可替换为其它模式或随机）
         for (i = 0; i < MAX_H; i = i + 1) begin
             for (j = 0; j < MAX_W; j = j + 1) begin
-                in_img[i][j] = i * MAX_W + j; // 可读的序列值
+                // in_img[i][j] = i * MAX_W + j; // 可读的序列值
+                in_img[i][j] = $random(); // 可读的序列值
             end
         end
 
@@ -125,7 +126,7 @@ module conv_tb;
                     expected = {DATA_WIDTH{1'b0}};
                 end else begin
                     // 截断为 DATA_WIDTH 位（低位截断）
-                    expected = acc[DATA_WIDTH-1:0];
+                    expected = acc[23:0];
                 end
 
                 if (out_pixel !== expected) begin

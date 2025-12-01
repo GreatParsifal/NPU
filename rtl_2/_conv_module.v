@@ -18,7 +18,7 @@ module conv #(
     input wire signed [DATA_WIDTH-1:0] w_conv [K_H][K_W], // buffer to read weight for a single channel, 3*3 = 9B
     output reg valid, // out_pixel valid signal
     output reg done, // calculation for the layer finished
-    output wire [DATA_WIDTH-1:0] out_pixel, // output pixel after convolution and ReLU (if needed)
+    output wire signed [23:0] out_pixel, // output pixel after convolution and ReLU (if needed)
     output reg [7:0] addr // address of out_pixel in the output figure of a single channel
 );
 
@@ -27,9 +27,11 @@ localparam S_IDLE = 0,
            S_WAIT = 2,
            S_DONE = 3;
 
+wire [4:0] OUT_W = in_w - K_W + 1;
+
 reg [2:0] state;
 
-reg [8:0] conv_win [0:K_H-1][0:K_W-1];
+reg signed [8:0] conv_win [0:K_H-1][0:K_W-1];
 
 task update_conv_opr;
     input [7:0] addr;

@@ -4,19 +4,19 @@ module conv_unit # (
     parameter IN_DATA_WIDTH = 9,
     parameter OUT_DATA_WIDTH = 8
 )(
-    input [IN_DATA_WIDTH-1:0] conv_win [K_H-1:0][K_W-1:0],
+    input signed [IN_DATA_WIDTH-1:0] conv_win [K_H-1:0][K_W-1:0],
     input signed [7:0] w [K_H-1:0][K_W-1:0],
     input en_relu,
-    output wire [OUT_DATA_WIDTH-1:0] out_pixel;
+    output wire signed [23:0] out_pixel
 );
 
 localparam N = K_H * K_W;
 
 // product wires
-wire signed [OUT_DATA_WIDTH-1:0] prod [0:N-1];
-reg signed [24:0] result; // intermediate result
+wire signed [23:0] prod [0:N-1];
+reg signed [23:0] result; // intermediate result
 
-assign out_pixel = result[OUT_DATA_WIDTH-1:0];
+assign out_pixel = result;
 
 genvar gi, gj;
 generate
@@ -36,7 +36,9 @@ always @* begin
     for (k = 0; k < N; k = k + 1) begin
         result = result + prod[k];
     end
-    if (en_relu) result = result[23] ? 24'b0 : result; // ReLU
+    if (en_relu && result < 0) begin
+        result = 0;
+    end
 end
 
 endmodule
