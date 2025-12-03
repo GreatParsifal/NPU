@@ -199,7 +199,4 @@ module npu #(
         end
     end
 
-
-
-
 endmodule

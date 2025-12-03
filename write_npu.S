@@ -1,4 +1,4 @@
-    lui   t0, 0x70006
+    lui   t0, 0x70001
     addi  t0, t0, 0      # base dest = 0x700030
 
     lui   t1, 0x60000
@@ -14,21 +14,35 @@ img_loop:
     addi  t3, t3, -1
     j     img_loop
 img_done:
-	lui t0,0x70001
+	
+    lui   t0,0x70002
     addi  t0, t0, 0
-    
-	li    t3, 23
+    li    t4, 10
 c1_loop:
-    beqz  t3, c1_done
-    lw    t2, 0(t1)
+	li    t3, 3
+    beqz  t4, c1_done
+    lui   t5, 0x70006
+    addi  t5, t5, 0
+k1_loop:
+    beqz  t3, k1_done   
+    lw    t2, 0(t1)     
     sw    t2, 0(t0)
-    addi  t1, t1, 4      # src += 4 (next 32-bit word)
-    addi  t0, t0, 1      # dest += 4 (must be +4, not +1)
-    addi  t3, t3, -1
-    j     c1_loop
+    addi  t1, t1, 4      
+    addi  t0, t0, 1      
+    addi  t3, t3, -1    # push the data
+    lui   t5, 0x70007
+    addi  t5, t5, 0
+    poll_valid:
+    lw    t6, 0(t5)
+    beqz  t6, poll_valid    # wait until valid
+    lui   t5, 0x70008
+
+    j     k1_loop
+k1_done:
+    addi  t4, t4, -1
 c1_done:
 
-lui t0,0x70002
+    lui t0,0x70002
     addi  t0, t0, 0
     li    t3, 23
 c2_loop:
