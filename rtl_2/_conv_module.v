@@ -82,12 +82,10 @@ always @ (posedge clk) begin
             state <= S_WAIT;
         end
         S_WAIT: begin
-            valid <= 0;
             if (save_done) begin
                 addr <= addr + 8'b1;
+                valid <= 0;
                 state <= S_CALC;
-            end else begin
-                state <= S_WAIT;
             end
         end
         default: begin                  // 删去了S_DONE状态，需要在换channel时reset卷积模块
