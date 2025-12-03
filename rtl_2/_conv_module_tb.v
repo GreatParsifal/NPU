@@ -22,12 +22,15 @@ module conv_tb;
 
     // DUT 输出
     wire valid;
-    wire unsigned [7:0] out_pixel;
+    wire signed [23:0] out_pixel_full;
+
     wire [7:0] addr;
     reg [7:0] cnt;
 
     // 实例化 DUT（端口名与模块一致）
-    conv dut (
+    wire [23:0] out_data;
+
+    conv u_conv (
         .clk(clk),
         .rst_n(rst_n),
         .trigger(trigger),
@@ -36,8 +39,21 @@ module conv_tb;
         .in_img(in_img),
         .w_conv(w_conv_tb),
         .valid(valid),
-        .out_pixel(out_pixel),
+        .out_pixel(out_pixel_full),
         .addr(addr)
+    );
+
+    
+    wire signed [23:0] out_data_full [12][11];
+    partial_sum u_sum (
+        .clk(clk),
+        .ce(layer),
+        .rst_n(rst_n),
+        .clear(1'b0),
+        .addr(addr),
+        .in_data(out_pixel_full),
+        .in_valid(valid),
+        .out_data(out_data_full) // 未连接
     );
 
     // 时钟生成
@@ -46,7 +62,7 @@ module conv_tb;
         forever #5 clk = ~clk; // 10ns 周期
     end
 
-    integer i, j, ii, jj;
+    integer i, j, ii, jj, c;
     integer out_w, out_h;
     integer row, col;
     integer cycles;
@@ -60,19 +76,19 @@ module conv_tb;
         rst_n = 0;
         trigger = 0;
         save_done = 0;
-        in_w = 15;
-        in_h = 16;
+        in_w = 13;
+        in_h = 14;
         chan = 4'd0;
-        layer = 1'b0; // 测试 conv1 (layer=0)；需要时可改成 1 测试 conv2
+        cnt = 0;
+        layer = 1'b1; // 测试 conv1 (layer=0)；需要时可改成 1 测试 conv2
         detected_done = 0;
 
-        // 填充输入图像（可替换为其它模式或随机）
-        for (i = 0; i < MAX_H; i = i + 1) begin
-            for (j = 0; j < MAX_W; j = j + 1) begin
-                in_img[i*in_w + j] = i * in_w + j; // 可读的序列值
-                // in_img[i*in_w + j] = $random(); // 可读的序列值
-            end
-        end
+        // 2. rst_n 低一段时间复位
+        #20;
+        rst_n = 0;
+        #20;
+        rst_n = 1;
+        #20;
 
         // 填充权重 (示例小整数)
         for (ii = 0; ii < K_H; ii = ii + 1) begin
@@ -80,14 +96,6 @@ module conv_tb;
                 w_conv_tb[ii][jj] = (ii - 1) + (jj - 1); // e.g. -2..2
             end
         end
-
-        // 2. rst_n 低一段时间复位
-        #20;
-        rst_n = 0;
-        cnt = 0;
-        #20;
-        rst_n = 1;
-        #20;
 
         // 3. 产生一个 trigger 上升沿脉冲，开始计算
         @(posedge clk);
@@ -99,7 +107,7 @@ module conv_tb;
         out_h = in_h - K_H + 1;
         out_w = in_w - K_W + 1;
 
-        // 4. 监测 valid / done，校验 out_pixel 与 addr 对应位置的真实值
+        // 4. 监测 valid，校验 out_pixel_full 与 addr 对应位置的真实值
         cycles = 0;
         while (!detected_done && cycles < 200000) begin
             @(posedge clk);

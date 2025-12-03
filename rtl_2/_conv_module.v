@@ -8,13 +8,14 @@ module conv #(
 )(
     input clk,
     input rst_n,
+    input clear,
     input trigger,
     input save_done,
     input wire layer, // 0 for conv1, 1 for conv2
     input wire [DATA_WIDTH-1:0] in_img [0 : MAX_H * MAX_W - 1], // buffer to read input image, 16*15 = 240B
     input wire signed [DATA_WIDTH-1:0] w_conv [K_H][K_W], // buffer to read weight for a single channel, 3*3 = 9B
     output reg valid, // out_pixel valid signal
-    output wire unsigned [7:0] out_pixel, // output pixel after convolution and ReLU (if needed)
+    output wire signed [23:0] out_pixel, // output pixel after convolution and ReLU (if needed)
     output reg [7:0] addr // address to read input image
 );
 
@@ -50,7 +51,7 @@ conv_unit #(
     .K_W(K_W),
     .IN_DATA_WIDTH(9),
     .OUT_DATA_WIDTH(8)
-) dut (
+) u_conv_unit (
     .conv_win(conv_win),
     .w(w_conv),
     .en_relu(~layer), // ReLU enabled for conv1
@@ -59,7 +60,7 @@ conv_unit #(
 
 // main loop
 always @ (posedge clk) begin
-    if (~rst_n) begin
+    if (~rst_n || clear) begin
         state <= S_IDLE;
         valid <= 0;
         addr <= 8'b0;

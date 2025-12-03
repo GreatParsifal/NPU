@@ -20,12 +20,14 @@ module npu #(
 );
     wire rst = ~rst_ni;
 
-    ocalparam int IMG_SIZE = IN1_H*IN1_W;
-    localparam int WC_SIZE  = K_H*K_W*CHAN;
+    localparam int IMG_SIZE = IN1_H*IN1_W;
+    localparam int WC_SIZE  = K_H*K_W;
     localparam int FV_LEN   = OUT2_H*OUT2_W;
 
     //conv layer
     logic [7:0] img_in_flat  [0:IMG_SIZE-1];
+    logic signed [7:0] w_conv_flat [0:WC_SIZE-1];
+    logic signed [7:0] w_conv [K_H][K_W];
     
     logic [7:0] conv_out     [0:OUT2_H-1][0:OUT2_W-1];
     logic [7:0] in_vec_array [0:IN1_N-1];
@@ -35,6 +37,16 @@ module npu #(
     logic signed [7:0] curr_w_stream [0:NUM_PE-1];
 
     genvar gi, gj, gk;
+    // reshape w_conv_flat to w_conv
+    generate
+        for (gi = 0; gi < K_H; gi++) begin : GEN_INVEC
+            for (gj = 0; gj < K_W; gj++) begin : GEN_INVEC_W
+                assign w_conv[gi][gj] = w_conv_flat[gi*K_W + gj];
+            end
+        end
+    endgenerate
+
+    // flatten conv_out to in_vec_array
     generate
         for (gi = 0; gi < OUT2_H; gi++) begin : GEN_INVEC
             for (gj = 0; gj < OUT2_W; gj++) begin : GEN_INVEC_W
@@ -44,6 +56,48 @@ module npu #(
     endgenerate
 
     //conv module
+    logic trigger;
+    logic save_done;
+    logic layer;
+    logic pixel_valid;
+    logic signed [23:0] out_pixel_full;
+    logic signed [7:0] conv1_out_pixel;
+    logic [7:0] pixel_addr;
+
+    assign conv1_out_pixel = out_pixel_full[7:0];
+    
+    conv_module # u_conv_module (
+        .clk(clk),
+        .rst_n(rst_ni),
+        .in_img(img_in_flat),
+        .w_conv(w_conv),
+        .trigger(trigger),
+        .layer(layer),
+        .out_pixel(out_pixel_full),
+        .addr(pixel_addr),
+        .valid(pixel_valid),
+        .save_done(save_done)
+    );
+
+    // conv_out buffer
+    logic clear;
+    logic signed [7:0] conv2_out_full [0:OUT2_H-1][0:OUT2_W-1];
+    for (gi = 0; gi < OUT2_H; gi++) begin : GEN_CONV_OUT_H
+        for (gj = 0; gj < OUT2_W; gj++) begin : GEN_CONV_OUT_W
+            assign conv_out[gi][gj] = conv2_out_full[gi][gj][23] ? 8'd0 : conv2_out_full[gi][gj][7:0]; // Relu
+        end
+    end
+
+    partial_sum # u_partial_sum (
+        .clk(clk),
+        .ce(layer),
+        .rst_n(rst_ni),
+        .clear(clear),
+        .addr(pixel_addr),
+        .in_valid(pixel_valid),
+        .in_data(out_pixel),
+        .out_data(conv_out_full)
+    );
 
     //fc module
     logic fcn_start;
