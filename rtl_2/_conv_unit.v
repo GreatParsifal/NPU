@@ -7,7 +7,7 @@ module conv_unit # (
     input signed [IN_DATA_WIDTH-1:0] conv_win [K_H-1:0][K_W-1:0],
     input signed [7:0] w [K_H-1:0][K_W-1:0],
     input en_relu,
-    output wire signed [23:0] out_pixel
+    output wire unsigned [7:0] out_pixel
 );
 
 localparam N = K_H * K_W;
@@ -16,7 +16,7 @@ localparam N = K_H * K_W;
 wire signed [23:0] prod [0:N-1];
 reg signed [23:0] result; // intermediate result
 
-assign out_pixel = result;
+assign out_pixel = result[7:0];
 
 genvar gi, gj;
 generate

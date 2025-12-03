@@ -17,14 +17,14 @@ module conv_tb;
     reg layer;
 
     // 输入/权重缓冲（testbench 提供）
-    reg [DATA_WIDTH-1:0] in_img [0:MAX_H-1][0:MAX_W-1];
-    reg signed [DATA_WIDTH-1:0] w_conv_tb [0:K_H-1][0:K_W-1];
+    reg [DATA_WIDTH-1:0] in_img [0 : MAX_H * MAX_W - 1];
+    reg signed [DATA_WIDTH-1:0] w_conv_tb [K_H][K_W];
 
     // DUT 输出
     wire valid;
-    wire done;
-    wire signed [23:0] out_pixel;
+    wire unsigned [7:0] out_pixel;
     wire [7:0] addr;
+    reg [7:0] cnt;
 
     // 实例化 DUT（端口名与模块一致）
     conv dut (
@@ -32,14 +32,10 @@ module conv_tb;
         .rst_n(rst_n),
         .trigger(trigger),
         .save_done(save_done),
-        .in_w(in_w),
-        .in_h(in_h),
-        .chan(chan),
         .layer(layer),
         .in_img(in_img),
         .w_conv(w_conv_tb),
         .valid(valid),
-        .done(done),
         .out_pixel(out_pixel),
         .addr(addr)
     );
@@ -55,7 +51,7 @@ module conv_tb;
     integer row, col;
     integer cycles;
     reg signed [31:0] acc;
-    reg signed [23:0] expected;
+    reg unsigned [7:0] expected;
     reg detected_done;
 
     initial begin
@@ -64,8 +60,8 @@ module conv_tb;
         rst_n = 0;
         trigger = 0;
         save_done = 0;
-        in_w = MAX_W; // 15
-        in_h = MAX_H; // 16
+        in_w = 15;
+        in_h = 16;
         chan = 4'd0;
         layer = 1'b0; // 测试 conv1 (layer=0)；需要时可改成 1 测试 conv2
         detected_done = 0;
@@ -73,8 +69,8 @@ module conv_tb;
         // 填充输入图像（可替换为其它模式或随机）
         for (i = 0; i < MAX_H; i = i + 1) begin
             for (j = 0; j < MAX_W; j = j + 1) begin
-                // in_img[i][j] = i * MAX_W + j; // 可读的序列值
-                in_img[i][j] = $random(); // 可读的序列值
+                in_img[i*in_w + j] = i * in_w + j; // 可读的序列值
+                // in_img[i*in_w + j] = $random(); // 可读的序列值
             end
         end
 
@@ -88,6 +84,7 @@ module conv_tb;
         // 2. rst_n 低一段时间复位
         #20;
         rst_n = 0;
+        cnt = 0;
         #20;
         rst_n = 1;
         #20;
@@ -108,7 +105,7 @@ module conv_tb;
             @(posedge clk);
             cycles = cycles + 1;
 
-            if (valid || done) begin
+            if (valid) begin
                 // addr mapping -> row, col
                 row = addr / out_w;
                 col = addr % out_w;
@@ -118,34 +115,35 @@ module conv_tb;
                 for (ii = 0; ii < K_H; ii = ii + 1) begin
                     for (jj = 0; jj < K_W; jj = jj + 1) begin
                         // in_img 无符号扩展为 1'b0 + DATA_WIDTH bits，然后与 signed weight 相乘
-                        acc = acc + $signed({1'b0, in_img[row + ii][col + jj]}) * $signed(w_conv_tb[ii][jj]);
+                        acc = acc + $signed({1'b0, in_img[(row + ii)*in_w + (col + jj)]}) * $signed(w_conv_tb[ii][jj]);
                     end
                 end
                 // 若 layer==0 则 en_relu = ~layer = 1 -> ReLU 有效（负值置 0）
                 if (~|layer && acc < 0) begin
-                    expected = {DATA_WIDTH{1'b0}};
+                    expected = {8{1'b0}};
                 end else begin
                     // 截断为 DATA_WIDTH 位（低位截断）
-                    expected = acc[23:0];
+                    expected = acc[7:0];
                 end
 
                 if (out_pixel !== expected) begin
-                    $display("ERROR: addr=%0d -> (row=%0d,col=%0d) DUT=%0d EXPECT=%0d at time %0t", addr, row, col, out_pixel, expected, $time);
+                    $display("ERROR: addr=%0d, cnt=%0d -> (row=%0d,col=%0d) DUT=%0d EXPECT=%0d at time %0t", addr, cnt, row, col, out_pixel, expected, $time);
                 end else begin
-                    $display("OK: addr=%0d -> (row=%0d,col=%0d) value=%0d at time %0t", addr, row, col, out_pixel, $time);
+                    $display("OK: addr=%0d, cnt=%0d -> (row=%0d,col=%0d) value=%0d at time %0t", addr, cnt, row, col, out_pixel, $time);
                 end
-                if (done) begin
+                if (addr == out_w * out_h - 1) begin
                     detected_done = 1;
-                    $display("Detected DONE at time %0t", $time);
+                    $display("Finished calculation at time %0t", $time);
                     // 5. 检测到 done 后等待 10 周期再结束仿真
                     repeat (10) @(posedge clk);
-                    $display("Testbench finished after DONE.");
+                    $display("Testbench finished after calculation finished.");
                     #10;
                     $finish;
                 end else begin
                     // 等待 3 个周期后给 save_done 一个脉冲（通知 DUT 已保存/消费该像素）
                     repeat (3) @(posedge clk);
                     save_done = 1;
+                    cnt += 1;
                     @(posedge clk);
                     save_done = 0;
                 end
