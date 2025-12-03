@@ -26,7 +26,7 @@ module npu #(
 
     //conv layer
     logic [7:0] img_in_flat  [0:IMG_SIZE-1];
-
+    
     logic [7:0] conv_out     [0:OUT2_H-1][0:OUT2_W-1];
     logic [7:0] in_vec_array [0:IN1_N-1];
 
@@ -134,6 +134,21 @@ module npu #(
     logic done_reg;
     logic signed [23:0] result_reg;
 
+    logic host_start_single_req;
+    logic host_fc1_next_req;
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            host_start_single_req <= 1'b0;
+            host_fc1_next_req    <= 1'b0;
+        end else begin
+            if (host_wea && sel==3'b101 && idx==12'd2) host_start_single_req <= 1'b1;
+            else host_start_single_req <= 1'b0;
+
+            if (host_wea && sel==3'b101 && idx==12'd3) host_fc1_next_req <= 1'b1;
+            else host_fc1_next_req <= 1'b0;
+        end
+    end
+
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
             state <= S_IDLE;
@@ -155,7 +170,29 @@ module npu #(
                     end
                 end
 
-                S_
+                S_READY_FCN: begin
+                    if (host_start_single_req) begin
+                        for (int p=0; p<NUM_PE; p++) w_stream[p] <= [p];
+                    end
+
+                    if (host_fc1_next_req) begin
+                        fcn_fc1_next <= 1'b1;
+                        fc1_group_valid_reg <= 1'b0;
+                    end
+
+                    if (fcn_fc1_valid) begin
+                        fc1_group_valid_reg <= 1'b1;
+                    end
+
+                    if (fcn_done) begin
+                        done_reg <= 1'b1;
+                        result_reg <= fcn_logit;
+                        state <= S_DONE;
+                    end
+                end
+                S_DONE: begin
+                    state <= S_IDLE;
+                end
                 
                 default: ;
             endcase

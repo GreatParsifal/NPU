@@ -26,7 +26,7 @@ module npu #(
 
     //conv layer
     logic [7:0] img_in_flat  [0:IMG_SIZE-1];
-
+    
     logic [7:0] conv_out     [0:OUT2_H-1][0:OUT2_W-1];
     logic [7:0] in_vec_array [0:IN1_N-1];
 
