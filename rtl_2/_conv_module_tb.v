@@ -17,31 +17,43 @@ module conv_tb;
     reg layer;
 
     // 输入/权重缓冲（testbench 提供）
-    reg [DATA_WIDTH-1:0] in_img [0:MAX_H-1][0:MAX_W-1];
-    reg signed [DATA_WIDTH-1:0] w_conv_tb [0:K_H-1][0:K_W-1];
+    reg [DATA_WIDTH-1:0] in_img [0 : MAX_H * MAX_W - 1];
+    reg signed [DATA_WIDTH-1:0] w_conv_tb [K_H][K_W];
 
     // DUT 输出
     wire valid;
-    wire done;
-    wire signed [23:0] out_pixel;
+    wire signed [23:0] out_pixel_full;
+
     wire [7:0] addr;
+    reg [7:0] cnt;
 
     // 实例化 DUT（端口名与模块一致）
-    conv dut (
+    wire [23:0] out_data;
+
+    conv u_conv (
         .clk(clk),
         .rst_n(rst_n),
         .trigger(trigger),
         .save_done(save_done),
-        .in_w(in_w),
-        .in_h(in_h),
-        .chan(chan),
         .layer(layer),
         .in_img(in_img),
         .w_conv(w_conv_tb),
         .valid(valid),
-        .done(done),
-        .out_pixel(out_pixel),
+        .out_pixel(out_pixel_full),
         .addr(addr)
+    );
+
+    
+    wire signed [23:0] out_data_full [12][11];
+    partial_sum u_sum (
+        .clk(clk),
+        .ce(layer),
+        .rst_n(rst_n),
+        .clear(1'b0),
+        .addr(addr),
+        .in_data(out_pixel_full),
+        .in_valid(valid),
+        .out_data(out_data_full) // 未连接
     );
 
     // 时钟生成
@@ -50,12 +62,12 @@ module conv_tb;
         forever #5 clk = ~clk; // 10ns 周期
     end
 
-    integer i, j, ii, jj;
+    integer i, j, ii, jj, c;
     integer out_w, out_h;
     integer row, col;
     integer cycles;
     reg signed [31:0] acc;
-    reg signed [23:0] expected;
+    reg unsigned [7:0] expected;
     reg detected_done;
 
     initial begin
@@ -64,26 +76,12 @@ module conv_tb;
         rst_n = 0;
         trigger = 0;
         save_done = 0;
-        in_w = MAX_W; // 15
-        in_h = MAX_H; // 16
+        in_w = 13;
+        in_h = 14;
         chan = 4'd0;
-        layer = 1'b0; // 测试 conv1 (layer=0)；需要时可改成 1 测试 conv2
+        cnt = 0;
+        layer = 1'b1; // 测试 conv1 (layer=0)；需要时可改成 1 测试 conv2
         detected_done = 0;
-
-        // 填充输入图像（可替换为其它模式或随机）
-        for (i = 0; i < MAX_H; i = i + 1) begin
-            for (j = 0; j < MAX_W; j = j + 1) begin
-                // in_img[i][j] = i * MAX_W + j; // 可读的序列值
-                in_img[i][j] = $random(); // 可读的序列值
-            end
-        end
-
-        // 填充权重 (示例小整数)
-        for (ii = 0; ii < K_H; ii = ii + 1) begin
-            for (jj = 0; jj < K_W; jj = jj + 1) begin
-                w_conv_tb[ii][jj] = (ii - 1) + (jj - 1); // e.g. -2..2
-            end
-        end
 
         // 2. rst_n 低一段时间复位
         #20;
@@ -91,6 +89,13 @@ module conv_tb;
         #20;
         rst_n = 1;
         #20;
+
+        // 填充权重 (示例小整数)
+        for (ii = 0; ii < K_H; ii = ii + 1) begin
+            for (jj = 0; jj < K_W; jj = jj + 1) begin
+                w_conv_tb[ii][jj] = (ii - 1) + (jj - 1); // e.g. -2..2
+            end
+        end
 
         // 3. 产生一个 trigger 上升沿脉冲，开始计算
         @(posedge clk);
@@ -102,13 +107,13 @@ module conv_tb;
         out_h = in_h - K_H + 1;
         out_w = in_w - K_W + 1;
 
-        // 4. 监测 valid / done，校验 out_pixel 与 addr 对应位置的真实值
+        // 4. 监测 valid，校验 out_pixel_full 与 addr 对应位置的真实值
         cycles = 0;
         while (!detected_done && cycles < 200000) begin
             @(posedge clk);
             cycles = cycles + 1;
 
-            if (valid || done) begin
+            if (valid) begin
                 // addr mapping -> row, col
                 row = addr / out_w;
                 col = addr % out_w;
@@ -118,34 +123,35 @@ module conv_tb;
                 for (ii = 0; ii < K_H; ii = ii + 1) begin
                     for (jj = 0; jj < K_W; jj = jj + 1) begin
                         // in_img 无符号扩展为 1'b0 + DATA_WIDTH bits，然后与 signed weight 相乘
-                        acc = acc + $signed({1'b0, in_img[row + ii][col + jj]}) * $signed(w_conv_tb[ii][jj]);
+                        acc = acc + $signed({1'b0, in_img[(row + ii)*in_w + (col + jj)]}) * $signed(w_conv_tb[ii][jj]);
                     end
                 end
                 // 若 layer==0 则 en_relu = ~layer = 1 -> ReLU 有效（负值置 0）
                 if (~|layer && acc < 0) begin
-                    expected = {DATA_WIDTH{1'b0}};
+                    expected = {8{1'b0}};
                 end else begin
                     // 截断为 DATA_WIDTH 位（低位截断）
-                    expected = acc[23:0];
+                    expected = acc[7:0];
                 end
 
                 if (out_pixel !== expected) begin
-                    $display("ERROR: addr=%0d -> (row=%0d,col=%0d) DUT=%0d EXPECT=%0d at time %0t", addr, row, col, out_pixel, expected, $time);
+                    $display("ERROR: addr=%0d, cnt=%0d -> (row=%0d,col=%0d) DUT=%0d EXPECT=%0d at time %0t", addr, cnt, row, col, out_pixel, expected, $time);
                 end else begin
-                    $display("OK: addr=%0d -> (row=%0d,col=%0d) value=%0d at time %0t", addr, row, col, out_pixel, $time);
+                    $display("OK: addr=%0d, cnt=%0d -> (row=%0d,col=%0d) value=%0d at time %0t", addr, cnt, row, col, out_pixel, $time);
                 end
-                if (done) begin
+                if (addr == out_w * out_h - 1) begin
                     detected_done = 1;
-                    $display("Detected DONE at time %0t", $time);
+                    $display("Finished calculation at time %0t", $time);
                     // 5. 检测到 done 后等待 10 周期再结束仿真
                     repeat (10) @(posedge clk);
-                    $display("Testbench finished after DONE.");
+                    $display("Testbench finished after calculation finished.");
                     #10;
                     $finish;
                 end else begin
                     // 等待 3 个周期后给 save_done 一个脉冲（通知 DUT 已保存/消费该像素）
                     repeat (3) @(posedge clk);
                     save_done = 1;
+                    cnt += 1;
                     @(posedge clk);
                     save_done = 0;
                 end
