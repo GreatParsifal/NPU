@@ -20,12 +20,12 @@ img_done:
     li    t4, 10
     lui   t2,0x60000
     addi  t2, t2, 2000
-    lui   t5, 0x70005
-    li    t6, 1
-    sw    t6, 0(t5)         # start signal
 c1_loop:
 	li    t3, 3
     beqz  t4, c1_done
+    lui   t5, 0x70005
+    li    t6, 1
+    sw    t6, 0(t5)         # start signal
     lui   t5, 0x70006
     addi  t5, t5, 0
 k1_loop:
@@ -54,6 +54,9 @@ k1_done:
     j     c1_loop
 c1_done:
 
+    lui   t5, 0x70005
+    li    t6, 8
+    sw    t6, 0(t5)         # next layer signal
     lui   t0,0x70002
     addi  t0, t0, 0
     li    t4, 10

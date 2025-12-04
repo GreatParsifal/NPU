@@ -142,19 +142,18 @@ module npu #(
             for (int i=0;i<OUT1_M;i++) fc2_w[i] <= 8'sd0;
             for (int p=0;p<NUM_PE;p++) curr_w_stream[p] <= 8'sd0;
         end else if (host_wea) begin
-            int base = idx * 4;
             unique case (sel)
                 3'b001: begin
-                    if (base+0 < IMG_SIZE) img_in_flat[base+0] <= dina[7:0];
-                    if (base+1 < IMG_SIZE) img_in_flat[base+1] <= dina[15:8];
-                    if (base+2 < IMG_SIZE) img_in_flat[base+2] <= dina[23:16];
-                    if (base+3 < IMG_SIZE) img_in_flat[base+3] <= dina[31:24];
+                    if (idx*4+0 < IMG_SIZE) img_in_flat[idx*4+0] <= dina[7:0];
+                    if (idx*4+1 < IMG_SIZE) img_in_flat[idx*4+1] <= dina[15:8];
+                    if (idx*4+2 < IMG_SIZE) img_in_flat[idx*4+2] <= dina[23:16];
+                    if (idx*4+3 < IMG_SIZE) img_in_flat[idx*4+3] <= dina[31:24];
                 end
                 3'b010: begin
-                    if (base+0 < WC_SIZE) w_conv_flat[base+0] <= dina[7:0];
-                    if (base+1 < WC_SIZE) w_conv_flat[base+1] <= dina[15:8];
-                    if (base+2 < WC_SIZE) w_conv_flat[base+2] <= dina[23:16];
-                    if (base+3 < WC_SIZE) w_conv_flat[base+3] <= dina[31:24];
+                    if (idx*4+0 < WC_SIZE) w_conv_flat[idx*4+0] <= dina[7:0];
+                    if (idx*4+1 < WC_SIZE) w_conv_flat[idx*4+1] <= dina[15:8];
+                    if (idx*4+2 < WC_SIZE) w_conv_flat[idx*4+2] <= dina[23:16];
+                    if (idx*4+3 < WC_SIZE) w_conv_flat[idx*4+3] <= dina[31:24];
                 end
                 3'b011: begin
                     curr_w_stream[0] <= dina[7:0];
@@ -163,10 +162,10 @@ module npu #(
                     curr_w_stream[3] <= dina[31:24];
                 end
                 3'b100: begin
-                    if (base+0 < OUT1_M) fc2_w[base+0] <= dina[7:0];
-                    if (base+1 < OUT1_M) fc2_w[base+1] <= dina[15:8];
-                    if (base+2 < OUT1_M) fc2_w[base+2] <= dina[23:16];
-                    if (base+3 < OUT1_M) fc2_w[base+3] <= dina[31:24];
+                    if (idx*4+0 < OUT1_M) fc2_w[idx*4+0] <= dina[7:0];
+                    if (idx*4+1 < OUT1_M) fc2_w[idx*4+1] <= dina[15:8];
+                    if (idx*4+2 < OUT1_M) fc2_w[idx*4+2] <= dina[23:16];
+                    if (idx*4+3 < OUT1_M) fc2_w[idx*4+3] <= dina[31:24];
                 end
                 3'b101: begin
                     // host_layer should keep 0 as conv1 calculating, 1 as conv2 calculating
