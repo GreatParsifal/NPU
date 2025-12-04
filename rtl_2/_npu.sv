@@ -130,6 +130,8 @@ module npu #(
 
     logic host_wea;
     assign host_wea = rst ? 1'b0 : (ena & wea);
+    logic host_rea;
+    assign host_rea = rst ? 1'b0 : (ena & ~wea);
     
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin

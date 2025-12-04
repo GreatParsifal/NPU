@@ -20,6 +20,9 @@ img_done:
     li    t4, 10
     lui   t2,0x60000
     addi  t2, t2, 2000
+    lui   t5, 0x70005
+    li    t6, 1
+    sw    t6, 0(t5)         # start signal
 c1_loop:
 	li    t3, 3
     beqz  t4, c1_done
@@ -69,9 +72,9 @@ k2_loop:
     addi  t3, t3, -1    # push the data
     lui   t5, 0x70007
     addi  t5, t5, 2
-    poll_valid:
+    poll_valid2:
     lw    t6, 0(t5)
-    beqz  t6, poll_valid    # wait until valid
+    beqz  t6, poll_valid2    # wait until valid
     lui   t5, 0x70007
     addi  t5, t5, 4
     lw    t6, 0(t5)         # read the output
