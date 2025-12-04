@@ -7,6 +7,7 @@
 ### address definition:
 #### port name: addr
 #### width: 3 + 12 = 15
+#### Write Configuration (wea = 1)
 ##### addr[14:12] defines the state of npu
     000: banned
     001: receiving img_in_flat
@@ -25,3 +26,8 @@
         addr[4]: ce (for partial_sum),
         addr[5]: clear_conv,
         addr[6]: clear_sum
+
+#### Read Configuration (wea = 0)
+##### addr[14:12] defines which signal to read from npu
+    001: pixel_valid
+    010: conv1_out_pixel
