@@ -17,6 +17,8 @@ img_done:
 	
     
     li    t4, 10            # count of channels
+    lui   s0, 0x60000
+    addi  s0, s0, 2000
 c1_loop:
 	li    t3, 3
     beqz  t4, c1_done
@@ -35,8 +37,7 @@ w1_done:
     li    t6, 1
     sw    t6, 0(t5)         # trigger signal
     li    t3, 182
-    lui   t2, 0x60000
-    addi  t2, t2, 2000
+    
 k1_loop:
     beqz  t3, k1_done   
     addi  t3, t3, -1    # push the data
@@ -46,10 +47,10 @@ k1_loop:
     lw    t6, 0(t5)
     beqz  t6, poll_valid    # wait until valid
     lui   t5, 0x70007
-    addi  t5, t5, 4
+    addi  t5, t5, 12
     lw    t6, 0(t5)         # read the output
-    sw    t6, 0(t2)         # save the output
-    addi  t2, t2, 1
+    sw    t6, 0(s0)         # save the output
+    addi  s0, s0, 1
     lui   t5, 0x70005
     li    t6, 4
     sw    t6, 0(t5)         # save_done
@@ -63,8 +64,8 @@ c1_done:
     li    t6, 8
     sw    t6, 0(t5)         # next layer signal
     li    t4, 10            # count of channels
-    lui   x5, 0x60000
-    addi  x5, x5, 2000
+    lui   s0, 0x60000
+    addi  s0, s0, 2000
 c2_loop:
 	li    t3, 3
     beqz  t4, c2_done
@@ -79,17 +80,21 @@ w2_loop:
     addi  t3, t3, -1  
     j     w2_loop
 w2_done:
-    li    t3, 46
+    li    t3, 45
+    lui   t5, 0x70001
 in_loop:
     beqz  t3, in_done
-    lw    t2, 0(x5)
-    sw    t2, 0(t1)
-    addi  t1, t1, 4
-    addi  x5, x5, 1
+    lw    t2, 0(s0)
+    sw    t2, 0(t5)
+    addi  t5, t5, 1
+    addi  s0, s0, 4
     addi  t3, t3, -1
     j     in_loop
 in_done:
-
+    lw    t2, 0(s0)
+    sw    t2, 0(t5)
+    addi  t5, t5, 1
+    addi  s0, s0, 2
     lui   t5, 0x70005
     li    t6, 1
     sw    t6, 0(t5)         # trigger signal
@@ -117,15 +122,15 @@ c2_done:
     li    t6, 8
     sw    t6, 0(t5)         # next layer signal
 
-    lui t0,0x70003
+    lui   t0,0x70003
     addi  t0, t0, 0
     li    t3, 132
 f1_loop:
     beqz  t3, f1_done
     lw    t2, 0(t1)
     sw    t2, 0(t0)
-    addi  t1, t1, 4      # src += 4 (next 32-bit word)
-    addi  t0, t0, 1      # dest += 4 (must be +4, not +1)
+    addi  t1, t1, 4     
+    addi  t0, t0, 1      
     addi  t3, t3, -1
     lui   t5, 0x70005
     li    t6, 16
@@ -135,38 +140,39 @@ f1_loop:
     poll_fcn:
     lw    t6, 0(t5)
     beqz  t6, poll_fcn    # wait until valid
+    lui   t5, 0x70005
+    li    t6, 2
+    sw    t6, 0(t5)         # next
     j     f1_loop
 f1_done:
-lui t0,0x70004
+
+    lui   t0, 0x70004
     addi  t0, t0, 0
     li    t3, 3
 f2_loop:
     beqz  t3, f2_done
     lw    t2, 0(t1)
     sw    t2, 0(t0)
-    addi  t1, t1, 4      # src += 4 (next 32-bit word)
-    addi  t0, t0, 1      # dest += 4 (must be +4, not +1)
+    addi  t1, t1, 4     
+    addi  t0, t0, 1     
     addi  t3, t3, -1
     j     f2_loop
 f2_done:
     
-lui t0,0x70005
-    addi  t0, t0, 1     
-    sw    t2, 0(t0)
-
     
 poll_done:
     lui   t0, 0x70007    
-    addi  t0, t0, 0
+    addi  t0, t0, 20
     li    t2, 0
     lw    t2, 0(t0)      
     beqz  t2, poll_done
 
    
     lui   t0, 0x70007   
-    addi  t0, t0, 1
-    addi  t4, t1, 2000
-    lw    t2, 0(t0) 
+    addi  t0, t0, 4
+    lw    t2, 0(t0)
+    lui   t4, 0x60000
+    addi  t4, t4, 1999
 	sw    t2, 0(t4)
     
 stop:
