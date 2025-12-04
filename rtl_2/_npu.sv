@@ -129,10 +129,7 @@ module npu #(
     wire [11:0] idx = addra[11:0];
 
     logic host_wea;
-    always_ff @(posedge clk or posedge rst) begin
-        if (rst) host_wea <= 1'b0;
-        else host_wea <= (ena && wea);
-    end
+    assign host_wea = rst ? 1'b0 : (ena & wea);
     
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
