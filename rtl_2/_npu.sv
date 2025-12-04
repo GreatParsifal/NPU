@@ -67,7 +67,7 @@ module npu #(
 
     assign conv1_out_pixel = out_pixel_full[7:0];
     
-    conv_module # u_conv_module (
+    conv_module  u_conv_module (
         .clk(clk),
         .rst_n(rst_ni),
         .clear(clear_conv_addr),
@@ -85,7 +85,7 @@ module npu #(
     logic clear_sum;
     logic signed [7:0] conv2_out_full [0:OUT2_H-1][0:OUT2_W-1];
 
-    partial_sum # u_partial_sum (
+    partial_sum  u_partial_sum (
         .clk(clk),
         .ce(layer),
         .rst_n(rst_ni),
@@ -111,7 +111,7 @@ module npu #(
     logic fcn_fc1_valid;
     logic fcn_fc1_next;
 
-    fcn # u_fcn (
+    fcn  u_fcn (
         .clk(clk),
         .rst_n(~rst),
         .in_vec(in_vec_array),
@@ -137,8 +137,7 @@ module npu #(
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
             for (int i=0;i<IMG_SIZE;i++) img_in_flat[i] <= 8'd0;
-            for (int i=0;i<WC_SIZE;i++) w_conv1_flat[i] <= 8'd0;
-            for (int i=0;i<WC_SIZE;i++) w_conv2_flat[i] <= 8'd0;
+            for (int i=0;i<WC_SIZE;i++) w_conv_flat[i] <= 8'd0;
             for (int i=0;i<OUT1_M;i++) fc2_w[i] <= 8'sd0;
             for (int p=0;p<NUM_PE;p++) curr_w_stream[p] <= 8'sd0;
         end else if (host_wea) begin
@@ -200,17 +199,14 @@ module npu #(
         if (rst) begin
             host_trigger <= 1'b0;
             host_save_done <= 1'b0;
-            rst_ni <= 1'b1;
             host_next_layer <= 1'b0;
         end else if (host_wea && sel==3'b101) begin
             host_trigger <= dina[0];
             host_save_done <= dina[2];
-            rst_ni <= dina[1];
             host_next_layer <= dina[3];
         end else begin
             host_trigger <= 1'b0;
             host_save_done <= 1'b0;
-            rst_ni <= 1'b1;
             host_next_layer <= 1'b0;
         end
     end
@@ -279,7 +275,9 @@ module npu #(
                 end
                 S_READY_FCN: begin
                     if (host_start_single_req) begin
-                        for (int p=0; p<NUM_PE; p++) w_stream[p] <= [p];
+                        for (int p=0; p<NUM_PE; p++) begin
+                            w_stream[p] <= curr_w_stream[p];
+                        end
                     end
 
                     if (host_fc1_next_req) begin
