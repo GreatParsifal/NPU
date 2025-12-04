@@ -83,7 +83,7 @@ module npu #(
 
     // conv_out buffer
     logic clear_sum;
-    logic signed [7:0] conv2_out_full [0:OUT2_H-1][0:OUT2_W-1];
+    logic signed [23:0] conv2_out_full [0:OUT2_H-1][0:OUT2_W-1];
 
     partial_sum  u_partial_sum (
         .clk(clk),
@@ -274,6 +274,7 @@ module npu #(
                     clear_conv_addr <= 1'b0;
                     if (host_next_layer) begin // change to conv2
                         state <= S_READY_FCN;
+                        layer <= 1'b0; // disable partial sum
                     end else if (host_trigger) begin
                         state <= S_CONV2;
                     end
