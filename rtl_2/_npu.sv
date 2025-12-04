@@ -202,10 +202,6 @@ module npu #(
     }state_e;
     state_e state;
 
-
-    
-    
-
     logic host_start_single_req;
     logic host_fc1_next_req;
     
