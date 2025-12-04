@@ -257,29 +257,29 @@ module npu #(
                     if (host_trigger) begin
                         state <= S_CONV1;
                         layer <= 1'b0; // conv1
-                    end
-                end
-                S_CONV1: begin
-                    if (host_next_layer) begin // change to conv2
+                    end else if (host_next_layer) begin // change to conv2
                         state <= S_CONV2_WAIT;
                         layer <= 1'b1; // conv2
                         clear_sum <= 1'b0;
                         clear_conv_addr <= 1'b1;
-                    end else if (pixel_addr == 182) begin
+                    end 
+                end
+                S_CONV1: begin
+                    if (pixel_addr == 182) begin
                         state <= S_IDLE;
                         clear_conv_addr <= 1'b1;
                     end
                 end
                 S_CONV2_WAIT: begin
                     clear_conv_addr <= 1'b0;
-                    if (host_trigger) begin
+                    if (host_next_layer) begin // change to conv2
+                        state <= S_READY_FCN;
+                    end else if (host_trigger) begin
                         state <= S_CONV2;
                     end
                 end
                 S_CONV2: begin
-                    if (host_next_layer) begin // change to conv2
-                        state <= S_READY_FCN;
-                    end else if (pixel_addr == 182) begin
+                    if (pixel_addr == 132) begin
                         state <= S_CONV2_WAIT;
                         clear_conv_addr <= 1'b1;
                     end
