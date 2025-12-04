@@ -28,6 +28,9 @@
         addr[6]: clear_sum
 
 #### Read Configuration (wea = 0)
-##### addr[14:12] defines which signal to read from npu
-    001: pixel_valid
-    010: conv1_out_pixel
+##### addr[14:12] are not cared
+##### addr[11:0]
+    12'd0: douta <= {31'd0, done_reg};
+    12'd4: douta <= {{8{result_reg[23]}}, result_reg};
+    12'd8: douta <= {31'd0, pixel_valid};
+    12'd12: douta <= {23'b0, conv1_out_pixel};

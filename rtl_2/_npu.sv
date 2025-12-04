@@ -181,11 +181,11 @@ module npu #(
         end
         else if (host_rea) begin
             unique case (sel)
-                case (idx_q)
+                case (idx)
                     12'd0: douta <= {31'd0, done_reg};
                     12'd4: douta <= {{8{result_reg[23]}}, result_reg};
                     12'd8: douta <= {31'd0, pixel_valid};
-                    12'd12: douta <= {23{conv1_out_pixel[7]}, conv1_out_pixel};
+                    12'd12: douta <= {23'b0, conv1_out_pixel};
                     default: douta <= 32'd0;
                 endcase
                 default: douta <= 32'd0;
