@@ -175,7 +175,7 @@ module npu #(
         end
         else if (host_rea) begin
             unique case (sel)
-		3'b111:
+		        3'b111:
                 case(idx)
                     12'd0: douta <= {31'd0, done_reg};
                     12'd4: douta <= {{8{result_reg[23]}}, result_reg};
@@ -265,7 +265,7 @@ module npu #(
                         layer <= 1'b1; // conv2
                         clear_sum <= 1'b0;
                         clear_conv_addr <= 1'b1;
-                    end else if (pixel_addr == (IMG_SIZE - 1) && host_save_done) begin
+                    end else if (pixel_addr == 182) begin
                         state <= S_IDLE;
                         clear_conv_addr <= 1'b1;
                     end
@@ -279,7 +279,7 @@ module npu #(
                 S_CONV2: begin
                     if (host_next_layer) begin // change to conv2
                         state <= S_READY_FCN;
-                    end else if (pixel_addr == (IMG_SIZE - 1) && host_save_done) begin
+                    end else if (pixel_addr == 182) begin
                         state <= S_CONV2_WAIT;
                         clear_conv_addr <= 1'b1;
                     end
