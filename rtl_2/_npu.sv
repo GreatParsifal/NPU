@@ -253,10 +253,9 @@ module npu #(
             done_reg <= 1'b0;
             unique case (state)
                 S_IDLE: begin
-                    clear_conv_addr <= 1'b1;
+                    clear_conv_addr <= 1'b0;
                     if (host_trigger) begin
                         state <= S_CONV1;
-                        clear_conv_addr <= 1'b0;
                         layer <= 1'b0; // conv1
                     end
                 end
@@ -272,17 +271,16 @@ module npu #(
                     end
                 end
                 S_CONV2_WAIT: begin
-                    clear_conv_addr <= 1'b1;
+                    clear_conv_addr <= 1'b0;
                     if (host_trigger) begin
                         state <= S_CONV2;
-                        clear_conv_addr <= 1'b0;
                     end
                 end
                 S_CONV2: begin
                     if (host_next_layer) begin // change to conv2
                         state <= S_READY_FCN;
                     end else if (pixel_addr == (IMG_SIZE - 1) && host_save_done) begin
-                        state <= S_IDLE;
+                        state <= S_CONV2_WAIT;
                         clear_conv_addr <= 1'b1;
                     end
                 end
