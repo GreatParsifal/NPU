@@ -91,7 +91,7 @@ module npu #(
         .rst_n(rst_ni),
         .clear(clear_sum),
         .addr(pixel_addr),
-        .in_valid(pixel_valid),
+        .in_valid(host_save_done),
         .in_data(out_pixel_full),
         .out_data(conv2_out_full),
         .out_valid()
@@ -229,19 +229,6 @@ module npu #(
             host_next_layer <= 1'b0;
             host_start_single_req <= 1'b0;
             host_fc1_next_req <= 1'b0;
-        end
-    end
-
-    always_ff @(posedge clk or posedge rst) begin
-        if (rst) begin
-            host_start_single_req <= 1'b0;
-            host_fc1_next_req    <= 1'b0;
-        end else begin
-            if (host_wea && sel==3'b101 && idx==12'd2) host_start_single_req <= 1'b1;
-            else host_start_single_req <= 1'b0;
-
-            if (host_wea && sel==3'b101 && idx==12'd3) host_fc1_next_req <= 1'b1;
-            else host_fc1_next_req <= 1'b0;
         end
     end
 
