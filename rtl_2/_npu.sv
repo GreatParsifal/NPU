@@ -180,7 +180,7 @@ module npu #(
                     12'd0: douta <= {31'd0, done_reg};
                     12'd4: douta <= {{8{result_reg[23]}}, result_reg};
                     12'd8: douta <= {31'd0, pixel_valid};
-                    12'd12: douta <= {23'b0, conv1_out_pixel};
+                    12'd12: douta <= {24'b0, conv1_out_pixel};
                     12'd16: douta <= {31'b0, fcn_fc1_valid};
                     12'd20: douta <= {31'b0, fcn_done};
                     default: douta <= 32'd0;
