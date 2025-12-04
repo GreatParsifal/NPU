@@ -62,10 +62,8 @@ module npu #(
     logic layer;
     logic pixel_valid;
     logic signed [23:0] out_pixel_full;
-    logic signed [7:0] conv1_out_pixel;
+    logic [7:0] conv1_out_pixel;
     logic [7:0] pixel_addr;
-
-    assign conv1_out_pixel = out_pixel_full[7:0];
     
     conv  u_conv (
         .clk(clk),
@@ -78,7 +76,24 @@ module npu #(
         .out_pixel(out_pixel_full),
         .addr(pixel_addr),
         .valid(pixel_valid),
-        .save_done(host_save_done)
+        .save_done(save_done_sim)
+    );
+
+    assign conv1_out_pixel = out_pixel_full[7:0];
+
+    // data package module
+    logic save_done_sim;
+    logic pack_valid;
+    logic [31:0] conv1_out_pack;
+    pack u_pack (
+        .clk(clk),
+        .rst_n(rst_ni),
+        .pixel_valid(pixel_valid),
+        .save_done(host_save_done),
+        .in_data(out_pixel_full[7:0]),
+        .save_done_sim(save_done_sim),
+        .pack_valid(pack_valid),
+        .pack_out_data(conv1_out_pack)
     );
 
     // conv_out buffer
@@ -93,8 +108,7 @@ module npu #(
         .addr(pixel_addr),
         .in_valid(host_save_done),
         .in_data(out_pixel_full),
-        .out_data(conv2_out_full),
-        .out_valid()
+        .out_data(conv2_out_full)
     );
 
     for (gi = 0; gi < OUT2_H; gi++) begin : GEN_CONV_OUT_H
@@ -180,8 +194,8 @@ module npu #(
                 case(idx)
                     12'd0: douta <= {31'd0, done_reg};
                     12'd4: douta <= {{8{result_reg[23]}}, result_reg};
-                    12'd8: douta <= {31'd0, pixel_valid};
-                    12'd12: douta <= {24'b0, conv1_out_pixel};
+                    12'd8: douta <= {31'd0, pack_valid};
+                    12'd12: douta <= conv1_out_pack;
                     12'd16: douta <= {31'b0, fc1_group_valid_reg};
                     12'd20: douta <= {31'b0, fcn_done};
                     default: douta <= 32'd0;
