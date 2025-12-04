@@ -10,8 +10,7 @@ module partial_sum #(
     input wire [7:0] addr,
     input wire signed [DATA_WIDTH-1:0] in_data,
     input wire in_valid,
-    output reg signed [DATA_WIDTH-1:0] out_data [0:H-1][0:W-1],
-    output reg out_valid
+    output reg signed [DATA_WIDTH-1:0] out_data [0:H-1][0:W-1]
 );
 
 integer i, j; // ptrs
