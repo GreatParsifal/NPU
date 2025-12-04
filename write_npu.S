@@ -18,6 +18,8 @@ img_done:
     lui   t0,0x70002
     addi  t0, t0, 0
     li    t4, 10
+    lui   t2,0x60000
+    addi  t2, t2, 2000
 c1_loop:
 	li    t3, 3
     beqz  t4, c1_done
@@ -31,32 +33,62 @@ k1_loop:
     addi  t0, t0, 1      
     addi  t3, t3, -1    # push the data
     lui   t5, 0x70007
-    addi  t5, t5, 0
+    addi  t5, t5, 2
     poll_valid:
     lw    t6, 0(t5)
     beqz  t6, poll_valid    # wait until valid
-    lui   t5, 0x70008
-
+    lui   t5, 0x70007
+    addi  t5, t5, 4
+    lw    t6, 0(t5)         # read the output
+    sw    t6, 0(t0)         # save the output
+    addi  t2, t0, 4
+    lui   t5, 0x70005
+    li    t6, 4
+    sw    t6, 0(t5)         # save_done
     j     k1_loop
 k1_done:
     addi  t4, t4, -1
 c1_done:
 
-    lui t0,0x70002
+    lui   t0,0x70002
     addi  t0, t0, 0
-    li    t3, 23
+    li    t4, 10
+    lui   t2,0x60000
+    addi  t2, t2, 2000
 c2_loop:
-    beqz  t3, c2_done
-    lw    t2, 0(t1)
+	li    t3, 3
+    beqz  t4, c2_done
+    lui   t5, 0x70006
+    addi  t5, t5, 0
+k2_loop:
+    beqz  t3, k2_done   
+    lw    t2, 0(t1)     
     sw    t2, 0(t0)
-    addi  t1, t1, 4      # src += 4 (next 32-bit word)
-    addi  t0, t0, 1      # dest += 4 (must be +4, not +1)
-    addi  t3, t3, -1
-    j     c2_loop
+    addi  t1, t1, 4      
+    addi  t0, t0, 1      
+    addi  t3, t3, -1    # push the data
+    lui   t5, 0x70007
+    addi  t5, t5, 2
+    poll_valid:
+    lw    t6, 0(t5)
+    beqz  t6, poll_valid    # wait until valid
+    lui   t5, 0x70007
+    addi  t5, t5, 4
+    lw    t6, 0(t5)         # read the output
+    sw    t6, 0(t0)         # save the output
+    addi  t2, t0, 4
+    lui   t5, 0x70005
+    li    t6, 4
+    sw    t6, 0(t5)         # save_done
+    j     k2_loop
+k2_done:
+    addi  t4, t4, -1
 c2_done:
+
+
 lui t0,0x70003
     addi  t0, t0, 0
-    li    t3, 330
+    li    t3, 3
 f1_loop:
     beqz  t3, f1_done
     lw    t2, 0(t1)

@@ -39,8 +39,8 @@ module npu #(
     genvar gi, gj, gk;
     // reshape w_conv_flat to w_conv
     generate
-        for (gi = 0; gi < K_H; gi++) begin : GEN_INVEC
-            for (gj = 0; gj < K_W; gj++) begin : GEN_INVEC_W
+        for (gi = 0; gi < K_H; gi++) begin : GEN_CONV
+            for (gj = 0; gj < K_W; gj++) begin : GEN_CONV_W
                 assign w_conv[gi][gj] = w_conv_flat[gi*K_W + gj];
             end
         end
@@ -67,7 +67,7 @@ module npu #(
 
     assign conv1_out_pixel = out_pixel_full[7:0];
     
-    conv_module  u_conv_module (
+    conv  u_conv (
         .clk(clk),
         .rst_n(rst_ni),
         .clear(clear_conv_addr),
@@ -129,15 +129,9 @@ module npu #(
     wire [11:0] idx = addra[11:0];
 
     logic host_wea;
-    logic host_rea;
     always_ff @(posedge clk or posedge rst) begin
         if (rst) host_wea <= 1'b0;
         else host_wea <= (ena && wea);
-    end
-
-    always_ff @(posedge clk or posedge rst) begin
-        if (rst) host_rea <= 1'b0;
-        else host_rea <= (ena && ~wea);
     end
     
     always_ff @(posedge clk or posedge rst) begin
@@ -177,18 +171,6 @@ module npu #(
                     // host_layer should keep 0 as conv1 calculating, 1 as conv2 calculating
                 end
                 default: ;
-            endcase
-        end
-        else if (host_rea) begin
-            unique case (sel)
-                case (idx_q)
-                    12'd0: douta <= {31'd0, done_reg};
-                    12'd4: douta <= {{8{result_reg[23]}}, result_reg};
-                    12'd8: douta <= {31'd0, pixel_valid};
-                    12'd12: douta <= {23{conv1_out_pixel[7]}, conv1_out_pixel};
-                    default: douta <= 32'd0;
-                endcase
-                default: douta <= 32'd0;
             endcase
         end
     end
