@@ -132,6 +132,8 @@ module npu #(
     assign host_wea = rst ? 1'b0 : (ena & wea);
     logic host_rea;
     assign host_rea = rst ? 1'b0 : (ena & ~wea);
+    logic done_reg;
+    logic signed [23:0] result_reg;
     
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -174,7 +176,8 @@ module npu #(
         end
         else if (host_rea) begin
             unique case (sel)
-                case (idx)
+		3'b111:
+                case(idx)
                     12'd0: douta <= {31'd0, done_reg};
                     12'd4: douta <= {{8{result_reg[23]}}, result_reg};
                     12'd8: douta <= {31'd0, pixel_valid};
@@ -198,8 +201,8 @@ module npu #(
     state_e state;
 
     logic fc1_group_valid_reg;
-    logic done_reg;
-    logic signed [23:0] result_reg;
+    
+    
 
     logic host_start_single_req;
     logic host_fc1_next_req;
