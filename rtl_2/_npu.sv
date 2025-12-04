@@ -181,6 +181,8 @@ module npu #(
                     12'd4: douta <= {{8{result_reg[23]}}, result_reg};
                     12'd8: douta <= {31'd0, pixel_valid};
                     12'd12: douta <= {23'b0, conv1_out_pixel};
+                    12'd16: douta <= {31'b0, fcn_fc1_valid};
+                    12'd20: douta <= {31'b0, fcn_done};
                     default: douta <= 32'd0;
                 endcase
                 default: douta <= 32'd0;
@@ -213,14 +215,20 @@ module npu #(
             host_trigger <= 1'b0;
             host_save_done <= 1'b0;
             host_next_layer <= 1'b0;
+            host_start_single_req <= 1'b0;
+            host_fc1_next_req <= 1'b0;
         end else if (host_wea && sel==3'b101) begin
             host_trigger <= dina[0];
             host_save_done <= dina[2];
             host_next_layer <= dina[3];
+            host_start_single_req <= dina[4];
+            host_fc1_next_req <= dina[5];
         end else begin
             host_trigger <= 1'b0;
             host_save_done <= 1'b0;
             host_next_layer <= 1'b0;
+            host_start_single_req <= 1'b0;
+            host_fc1_next_req <= 1'b0;
         end
     end
 
