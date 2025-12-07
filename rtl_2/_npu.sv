@@ -89,8 +89,9 @@ module npu #(
         .clk(clk),
         .rst_n(rst_ni),
         .pixel_valid(pixel_valid),
+        .pix_addr(pixel_addr),
         .save_done(host_save_done),
-        .in_data(out_pixel_full[7:0]),
+        .in_data(conv1_out_pixel),
         .save_done_sim(save_done_sim),
         .pack_valid(pack_valid),
         .pack_out_data(conv1_out_pack)

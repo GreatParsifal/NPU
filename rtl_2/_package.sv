@@ -3,6 +3,7 @@ module pack (
     input logic rst_n,
     input logic pixel_valid,
     input logic save_done,
+    input logic [7:0] pix_addr,
     input logic [7:0] in_data,
     output logic save_done_sim,
     output logic pack_valid,
@@ -17,7 +18,11 @@ always_ff @(posedge clk or negedge rst_n) begin
     end else begin
         case (pix_count)
             2'd0: pix_count <= pixel_valid ? 2'd1 : 2'd0;
-            2'd1: pix_count <= pixel_valid ? 2'd2 : 2'd1;
+            2'd1: begin if (pix_addr == 8'd181) // last pixel addr
+                    pix_count <= 2'd0;
+                end else begin
+                    pix_count <= pixel_valid ? 2'd2 : 2'd1;
+                end
             2'd2: pix_count <= pixel_valid ? 2'd3 : 2'd2;
             2'd3: pix_count <= save_done ? 2'd0 : 2'd3;
             default: pix_count <= 2'd0;
@@ -30,7 +35,9 @@ always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         pack_valid <= 1'b0;
     end else begin
-        if (pack_count == 2'd3) begin
+        if (pix_addr == 8'd181 && pixel_valid) begin
+            pack_valid <= save_done ? 1'b0 : 1'b1;
+        end else if (pix_count == 2'd3) begin
             pack_valid <= save_done ? 1'b0 : 1'b1;
         end
     end
