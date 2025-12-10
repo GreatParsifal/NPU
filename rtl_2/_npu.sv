@@ -64,6 +64,20 @@ module npu #(
         .shift(conv_w_shift)
     );
 
+    // conv output package module
+    logic valid_reg;
+    logic host_pack_clear;
+    logic conv1_out_pack;
+    logic [23:0] result_reg;
+    pack conv_out_pack (
+        .clk(clk),
+        .rst_n(rst_ni),
+        .in_valid(valid_reg),
+        .in_data(result_reg),
+        .clear(host_pack_clear),
+        .outdata(conv1_out_pack)
+    );
+
     // pe generate
     logic signed [8:0] pe_input_sel [0:K_H-1];
     logic signed [7:0] pe_w_sel [0:K_H-1];
@@ -92,9 +106,8 @@ module npu #(
         S_CONV2_LD,
         S_CONV2_CAL,
         S_CONV2_MINUS,
-        S_FCN1,
-        S_FCN1_LAST,
-        S_FCN2,
+        S_FCN,
+        S_FCN_LAST,
         S_DONE
     }state_e;
     state_e state;
@@ -102,8 +115,6 @@ module npu #(
     // pe input selection
     always_comb begin : pe_sel_logic
         unique case (state)
-            S_IDLE: 
-            S_CONV1_LD: 
             S_CONV1_CAL: begin
                 pe_input_sel = {1'b0, img_pos};
                 pe_w_sel = conv_w;
@@ -112,7 +123,6 @@ module npu #(
                 pe_input_sel = {1'b1, img_neg};
                 pe_w_sel = conv_w;
             end
-            S_CONV2_LD: 
             S_CONV2_CAL: begin
                 pe_input_sel = {1'b0, img_pos};
                 pe_w_sel = conv_w;
@@ -121,7 +131,7 @@ module npu #(
                 pe_input_sel = {1'b1, img_neg};
                 pe_w_sel = conv_w;
             end
-            S_FCN1: begin // 1 input multiplied with weight from 3 channels
+            S_FCN: begin // 1 input multiplied with weight from 3 channels
                 pe_w_sel[0] = {1'b0, fcn_in[7:0]};
                 pe_w_sel[1] = {1'b0, fcn_in[15:8]};
                 pe_w_sel[2] = {1'b0, fcn_in[23:16]};
@@ -129,28 +139,21 @@ module npu #(
                 pe_input_sel[1] = fcn_in[31:24];
                 pe_input_sel[2] = fcn_in[31:24];
             end
-            S_FCN1_LAST: begin // 3 input multiplied with weight from 1 channel, pe result is summed up by wine pe_sum
-                pe_input_sel[0] = {1'b0, fcn_in[7:0]};
-                pe_input_sel[1] = {1'b0, fcn_in[15:8]};
-                pe_input_sel[2] = {1'b0, fcn_in[23:16]};
-                pe_w_sel[0] = fcn_in[31:24];
-                pe_w_sel[1] = fcn_in[31:24];
-                pe_w_sel[2] = fcn_in[31:24];
-            end
-            S_FCN2: begin // 2 input multiplied with 2 weights, 5 cycles of calculation are needed for the whole layer
+            S_FCN_LAST: begin // 2 input multiplied with 2 weights, 5 cycles of calculation are needed for the whole layer
                 pe_input_sel[0] = {1'b0, fcn_in[7:0]};
                 pe_input_sel[1] = {1'b0, fcn_in[15:8]};
                 pe_w_sel[0] = fcn_in[23:16];
                 pe_w_sel[1] = fcn_in[31:24];
             end
-            S_DONE: 
+            default: begin
+                pe_input_sel = 9'b0;
+                pe_w_sel = 8'b0;
+            end
         endcase
     end
     
     // main
-    logic valid_reg;
     logic done_reg;
-    logic [23:0] result_reg;
     logic host_next_state;
 
     assign host_trigger = (sel == 3'b100) ? dina[0] : 1'b0;
@@ -158,6 +161,7 @@ module npu #(
     assign host_pe_clear = (sel == 3'b100) ? dina[2] : 1'b0;
     assign host_img_clear = (sel == 3'b100) ? dina[3] : 1'b0;
     assign host_conv_w_clear = (sel == 3'b100) ? dina[4] : 1'b0;
+    assign host_pack_clear = (sel == 3'b100) ? dina[5] : 1'b0;
     
     // main FSM
     always_ff @(posedge clk or posedge rst) begin
@@ -196,7 +200,7 @@ module npu #(
                 S_CONV2_LD: begin
                     w_shift <= 1'b0;
                     if (host_next_state) begin
-                        state <= S_FCN1;
+                        state <= S_FCN;
                     end else
                     if (host_trigger) begin
                         valid_reg <= 1'b0;
@@ -214,17 +218,12 @@ module npu #(
                     state <= S_CONV2_LD;
                     w_shift <= 1'b1;
                 end
-                S_FCN1: begin
+                S_FCN: begin
                     if (host_next_state) begin
-                        state <= S_FCN1_LAST;
+                        state <= S_FCN_LAST;
                     end
                 end
-                S_FCN1_LAST: begin
-                    if (host_next_state) begin
-                        state <= S_FCN2;
-                    end
-                end
-                S_FCN2: begin
+                S_FCN_LAST: begin
                     if (host_next_state) begin
                         state <= S_DONE;
                     end
@@ -245,6 +244,22 @@ module npu #(
     assign host_wea = rst ? 1'b0 : (ena & wea);
     logic host_rea;
     assign host_rea = rst ? 1'b0 : (ena & ~wea);
+    logic [31:0] result_sel;
+
+    always_comb begin : result_selection
+        case(state)
+            S_CONV1_CAL: result_sel = conv1_out_pack;
+            S_CONV2_CAL: result_sel = {8'b0, result_reg};
+            S_FCN: begin
+                result_sel[7:0] = pe_out[0][23] ? 8'b0 : pe_out[0][7:0];
+                result_sel[15:8] = pe_out[0][23] ? 8'b0 : pe_out[0][15:8];
+                result_sel[23:16] = pe_out[0][23] ? 8'b0 : pe_out[0][23:16];
+                result_sel[31:24] = 8'b0;
+            end
+            S_FCN1_LAST: result_sel = pe_sum[23] ? 32'b0 : {24'b0, pe_sum[7:0]};
+            default: result_sel = 32'b0;
+        endcase
+    end
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -278,9 +293,8 @@ module npu #(
         else if (host_rea) begin
             unique case (sel)
 		        3'd1: douta <= {31'd0, done_reg};
-                3'd2: douta <= {24'b0, result_reg};
-                3'd3: douta <= {31'd0, pixel_valid};
-                3'd4: douta <= {23'b0, conv2_out_pixel};
+                3'd2: douta <= result_sel;
+                3'd3: douta <= {31'd0, valid_reg};
                 default: douta <= 32'd0;
             endcase
         end
