@@ -25,6 +25,5 @@
 #### Read Configuration (wea = 0)
 ##### addr[2:0]
     3'd1: douta <= {31'd0, done_reg};
-    3'd2: douta <= conv1_out_pack;
-    3'd3: douta <= {31'd0, pixel_valid};
-    3'd4: douta <= {23'b0, conv2_out_pixel};
+    3'd2: douta <= result_sel  // numeric result are sent in this channel
+    3'd3: douta <= {31'd0, valid_reg};
