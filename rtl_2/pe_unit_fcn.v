@@ -4,7 +4,7 @@ module pe_unit_fcn(
     input  wire              clr,       // fcn need a logic to clear accumulators
     input  wire              ready,     
     input  wire signed [7:0] in_data1,  // weight
-    input  wire signed [7:0] in_data2,  // input
+    input  wire signed [8:0] in_data2,  // input
     output reg  signed [23:0] outdata
 );
     always @(posedge clk or negedge rst_n) begin
