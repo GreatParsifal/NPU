@@ -124,14 +124,19 @@ c2_done:
 
     lui   t0,0x70003
     addi  t0, t0, 0
-    li    t3, 132
+    li    t3, 3
 f1_loop:
     beqz  t3, f1_done
+    li    t4, 33
+wfc1_loop:
+    beqz  t4, wfc1_done
     lw    t2, 0(t1)
     sw    t2, 0(t0)
     addi  t1, t1, 4     
     addi  t0, t0, 1      
-    addi  t3, t3, -1
+    addi  t4, t4, -1
+    j     wfc1_loop
+wfc1_done:
     lui   t5, 0x70005
     li    t6, 16
     sw    t6, 0(t5)         # trigger signal
@@ -143,6 +148,7 @@ f1_loop:
     lui   t5, 0x70005
     li    t6, 2
     sw    t6, 0(t5)         # next
+    addi  t3, t3, -1
     j     f1_loop
 f1_done:
 
