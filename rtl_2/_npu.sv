@@ -30,14 +30,17 @@ module npu #(
     logic signed [8:0] img_neg[0:K_H-1];
     logic host_img_clear;
 
-    logic signed [7:0] in_w [0:K_H-1];
-    logic signed [7:0] w   [0:K_H-1];
-    logci host_w_clear;
-    logic w_shift;
+    logic signed [7:0] in_conv_w [0:K_H-1];
+    logic signed [7:0] conv_w   [0:K_H-1];
+    logci host_conv_w_clear;
+    logic conv_w_shift;
 
     logic signed [23:0] pe_out[0:K_H-1];
-    logic signed [23:0] conv_sum;
-    logic trigger, minus_trigger;
+    logic signed [23:0] pe_sum;
+    logic host_trigger, minus_trigger;
+
+    // fcn layer
+    logic [31:0] fcn_input;
 
     // addra decode
     wire [2:0] sel = addra[2:0];
@@ -56,9 +59,9 @@ module npu #(
         .clk(clk),
         .rst_n(rst_ni),
         .load_en(sel == 3'b010 && host_wea),
-        .in_data(in_w),
-        .out_data1(w),
-        .shift(w_shift)
+        .in_data(in_conv_w),
+        .out_data1(conv_w),
+        .shift(conv_w_shift)
     );
 
     // pe generate
@@ -71,12 +74,12 @@ module npu #(
                 .clk(clk),
                 .rst_n(rst_ni),
                 .clear(host_pe_clear),
-                .ready(trigger||minus_trigger),
-                .in_data1(w[gi]),
-                .in_data2(img_sel[gi]),
+                .ready(host_trigger||minus_trigger),
+                .in_data1(pe_w_sel[gi]),
+                .in_data2(pe_input_sel[gi]),
                 .outdata(pe_out[gi])
             );
-            assign conv_sum += pe_out[gi];
+            assign pe_sum += pe_out[gi];
         end
     endgenerate
 
@@ -96,22 +99,65 @@ module npu #(
     }state_e;
     state_e state;
 
-    always_comb begin : img_sel_logic
-        if (state == S_CONV1_MINUS || state == S_CONV2_MINUS) begin
-            for (int i = 0; i < K_H; i = i + 1) begin
-                img_sel[i] = {1'b1, img_neg[i]};
+    // pe input selection
+    always_comb begin : pe_sel_logic
+        unique case (state)
+            S_IDLE: 
+            S_CONV1_LD: 
+            S_CONV1_CAL: begin
+                pe_input_sel = {1'b0, img_pos};
+                pe_w_sel = conv_w;
             end
-        end else begin
-            for (int i = 0; i < K_H; i = i + 1) begin
-                img_sel[i] = {1'b0, img_pos[i]};
+            S_CONV1_MINUS: begin
+                pe_input_sel = {1'b1, img_neg};
+                pe_w_sel = conv_w;
             end
-        end
+            S_CONV2_LD: 
+            S_CONV2_CAL: begin
+                pe_input_sel = {1'b0, img_pos};
+                pe_w_sel = conv_w;
+            end
+            S_CONV2_MINUS: begin
+                pe_input_sel = {1'b1, img_neg};
+                pe_w_sel = conv_w;
+            end
+            S_FCN1: begin // 1 input multiplied with weight from 3 channels
+                pe_w_sel[0] = {1'b0, fcn_in[7:0]};
+                pe_w_sel[1] = {1'b0, fcn_in[15:8]};
+                pe_w_sel[2] = {1'b0, fcn_in[23:16]};
+                pe_input_sel[0] = fcn_in[31:24];
+                pe_input_sel[1] = fcn_in[31:24];
+                pe_input_sel[2] = fcn_in[31:24];
+            end
+            S_FCN1_LAST: begin // 3 input multiplied with weight from 1 channel, pe result is summed up by wine pe_sum
+                pe_input_sel[0] = {1'b0, fcn_in[7:0]};
+                pe_input_sel[1] = {1'b0, fcn_in[15:8]};
+                pe_input_sel[2] = {1'b0, fcn_in[23:16]};
+                pe_w_sel[0] = fcn_in[31:24];
+                pe_w_sel[1] = fcn_in[31:24];
+                pe_w_sel[2] = fcn_in[31:24];
+            end
+            S_FCN2: begin // 2 input multiplied with 2 weights, 5 cycles of calculation are needed for the whole layer
+                pe_input_sel[0] = {1'b0, fcn_in[7:0]};
+                pe_input_sel[1] = {1'b0, fcn_in[15:8]};
+                pe_w_sel[0] = fcn_in[23:16];
+                pe_w_sel[1] = fcn_in[31:24];
+            end
+            S_DONE: 
+        endcase
     end
     
     // main
     logic valid_reg;
     logic done_reg;
     logic [23:0] result_reg;
+    logic host_next_state;
+
+    assign host_trigger = (sel == 3'b100) ? dina[0] : 1'b0;
+    assign host_next_state = (sel == 3'b100) ? dina[1] : 1'b0;
+    assign host_pe_clear = (sel == 3'b100) ? dina[2] : 1'b0;
+    assign host_img_clear = (sel == 3'b100) ? dina[3] : 1'b0;
+    assign host_conv_w_clear = (sel == 3'b100) ? dina[4] : 1'b0;
     
     // main FSM
     always_ff @(posedge clk or posedge rst) begin
@@ -131,13 +177,13 @@ module npu #(
                     if (host_next_state) begin
                         state <= S_CONV2_LD;
                     end else
-                    if (trigger) begin
+                    if (host_trigger) begin
                         valid_reg <= 1'b0;
                         state <= S_CONV1_CAL;
                     end
                 end
                 S_CONV1_CAL: begin
-                    result_reg <= (conv_sum[23]) ? 24'sd0 : conv_sum; // relu
+                    result_reg <= (pe_sum[23]) ? 24'sd0 : pe_sum; // relu
                     valid_reg <= 1'b1;
                     state <= S_CONV1_MINUS;
                     minus_trigger <= 1'b1;
@@ -152,13 +198,13 @@ module npu #(
                     if (host_next_state) begin
                         state <= S_FCN1;
                     end else
-                    if (trigger) begin
+                    if (host_trigger) begin
                         valid_reg <= 1'b0;
                         state <= S_CONV2_CAL;
                     end
                 end
                 S_CONV2_CAL: begin
-                    result_reg <= conv_sum; // no relu
+                    result_reg <= pe_sum; // no relu
                     valid_reg <= 1'b1;
                     state <= S_CONV2_MINUS;
                     minus_trigger <= 1'b1;
@@ -199,21 +245,12 @@ module npu #(
     assign host_wea = rst ? 1'b0 : (ena & wea);
     logic host_rea;
     assign host_rea = rst ? 1'b0 : (ena & ~wea);
-    
-task clear_all;
-    for (int i=0;i<K_H;i=i+1) begin
-        for (int j=0;j<K_W;j=j+1) begin
-            in_conv[i][j] <= 8'd0;
-            w_conv[i][j] <= 8'd0;
-        end
-    end
-endtask
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
             host_img_clear <= 1'b1;
             host_pe_clear <= 1'b1;
-            host_w_clear <= 1'b1;
+            host_conv_w_clear <= 1'b1;
         end else if (host_wea) begin
             unique case (sel)
                 3'b001: begin
@@ -222,15 +259,18 @@ endtask
                     in_img[2] <= dina[23:16];
                 end
                 3'b010: begin
-                    in_w[0] <= dina[7:0];
-                    in_w[1] <= dina[15:8];
-                    in_w[2] <= dina[23:16];
+                    in_conv_w[0] <= dina[7:0];
+                    in_conv_w[1] <= dina[15:8];
+                    in_conv_w[2] <= dina[23:16];
                 end
                 3'b011: begin
-                    // fcn_in and fcn_w
+                    fcn_in[7:0] <= dina[7:0];
+                    fcn_in[15:8] <= dina[15:8];
+                    fcn_in[23:16] <= dina[23:16];
+                    fcn_in[31:24] <= dina[31:24];
                 end
                 3'b100: begin
-                    // other signals
+                    // trigger and clear signals
                 end
                 default: ;
             endcase
@@ -244,14 +284,6 @@ endtask
                 default: douta <= 32'd0;
             endcase
         end
-    end
-
-    // FSM for trigger signals
-    logic valid;
-    logic host_trigger;
-    logic host_next_state;
-    always_ff @(posedge clk or posedge rst) begin
-
     end
 
 endmodule
