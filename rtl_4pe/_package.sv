@@ -12,7 +12,7 @@ logic [1:0] addr;
 
 genvar gi;
 generate
-    for (int gi=0;gi<4;gi=gi+1) begin
+    for (gi=0;gi<4;gi=gi+1) begin
         assign out_data[gi*8+7:gi*8] = register[gi];
     end
 endgenerate

@@ -93,9 +93,10 @@ module npu #(
                 .in_data2(pe_input_sel[gi]),
                 .outdata(pe_out[gi])
             );
-            assign pe_sum += pe_out[gi];
         end
     endgenerate
+
+    assign pe_sum = pe_out[0] + pe_out[1] + pe_out[2];
 
     //control FSM
     typedef enum logic [2:0] {
