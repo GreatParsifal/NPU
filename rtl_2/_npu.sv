@@ -177,7 +177,6 @@ module npu #(
                     state <= S_CONV1_LD;
                 end
                 S_CONV1_LD: begin
-                    w_shift <= 1'b0;
                     if (host_next_state) begin
                         state <= S_CONV2_LD;
                     end else
@@ -191,14 +190,14 @@ module npu #(
                     valid_reg <= 1'b1;
                     state <= S_CONV1_MINUS;
                     minus_trigger <= 1'b1;
+                    w_shift <= 1'b1;
                 end
                 S_CONV1_MINUS: begin
                     minus_trigger <= 1'b0;
                     state <= S_CONV1_LD;
-                    w_shift <= 1'b1;
+                    w_shift <= 1'b0;
                 end
                 S_CONV2_LD: begin
-                    w_shift <= 1'b0;
                     if (host_next_state) begin
                         state <= S_FCN;
                     end else
@@ -212,11 +211,12 @@ module npu #(
                     valid_reg <= 1'b1;
                     state <= S_CONV2_MINUS;
                     minus_trigger <= 1'b1;
+                    w_shift <= 1'b1;
                 end
                 S_CONV2_MINUS: begin
                     minus_trigger <= 1'b0;
                     state <= S_CONV2_LD;
-                    w_shift <= 1'b1;
+                    w_shift <= 1'b0;
                 end
                 S_FCN: begin
                     if (host_next_state) begin
