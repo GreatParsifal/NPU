@@ -156,8 +156,12 @@ module npu #(
                 pe_w_sel[1] = fcn_in[31:24];
             end
             default: begin
-                pe_input_sel = 9'b0;
-                pe_w_sel = 8'b0;
+                pe_w_sel[0] = 8'b0;
+                pe_w_sel[1] = 8'b0;
+                pe_w_sel[2] = 8'b0;
+                pe_input_sel[0] = 9'b0;
+                pe_input_sel[1] = 9'b0;
+                pe_input_sel[2] = 9'b0;
             end
         endcase
     end
