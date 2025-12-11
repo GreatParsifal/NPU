@@ -76,7 +76,7 @@ module npu #(
         .in_valid(valid_reg),
         .in_data(result_reg),
         .clear(host_pack_clear),
-        .outdata(conv1_out_pack)
+        .out_data(conv1_out_pack)
     );
 
     // pe generate
@@ -88,7 +88,7 @@ module npu #(
             pe_unit_fcn pe_conv_inst (
                 .clk(clk),
                 .rst_n(rst_ni),
-                .clear(host_pe_clear),
+                .clr(host_pe_clear),
                 .ready(host_trigger||minus_trigger),
                 .in_data1(pe_w_sel[gi]),
                 .in_data2(pe_input_sel[gi]),
@@ -118,19 +118,27 @@ module npu #(
     always_comb begin : pe_sel_logic
         unique case (state)
             S_CONV1_CAL: begin
-                pe_input_sel = {1'b0, img_pos};
+                pe_input_sel[0] = {1'b0, img_pos[0]};
+                pe_input_sel[1] = {1'b0, img_pos[1]};
+                pe_input_sel[2] = {1'b0, img_pos[2]};
                 pe_w_sel = conv_w;
             end
             S_CONV1_MINUS: begin
-                pe_input_sel = {1'b1, img_neg};
+                pe_input_sel[0] = {1'b0, img_neg[0]};
+                pe_input_sel[1] = {1'b0, img_neg[1]};
+                pe_input_sel[2] = {1'b0, img_neg[2]};
                 pe_w_sel = conv_w;
             end
             S_CONV2_CAL: begin
-                pe_input_sel = {1'b0, img_pos};
+                pe_input_sel[0] = {1'b0, img_pos[0]};
+                pe_input_sel[1] = {1'b0, img_pos[1]};
+                pe_input_sel[2] = {1'b0, img_pos[2]};
                 pe_w_sel = conv_w;
             end
             S_CONV2_MINUS: begin
-                pe_input_sel = {1'b1, img_neg};
+                pe_input_sel[0] = {1'b0, img_neg[0]};
+                pe_input_sel[1] = {1'b0, img_neg[1]};
+                pe_input_sel[2] = {1'b0, img_neg[2]};
                 pe_w_sel = conv_w;
             end
             S_FCN: begin // 1 input multiplied with weight from 3 channels
