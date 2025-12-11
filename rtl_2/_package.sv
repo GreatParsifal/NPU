@@ -1,31 +1,66 @@
 module pack (
     input logic clk,
     input logic rst_n,
-    input logic in_valid,
-    input logic clear,
-    input logic [23:0] in_data,
-    output logic [31:0] out_data
+    input logic pixel_valid,
+    input logic save_done,
+    input logic [7:0] in_data,
+    output logic save_done_sim,
+    output logic pack_valid,
+    output logic [31:0] pack_out_data
 );
 
-logic [7:0] register [0:3];
-logic [1:0] addr;
-
-genvar gi
-generate
-    for (int gi=0;gi<4;gi=gi+1) begin
-        assign out_data[gi*8+7:gi*8] = register[gi];
+// pix_count logic
+logic [1:0] pix_count;
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        pix_count <= 2'd0;
+    end else begin
+        case (pix_count)
+            2'd0: pix_count <= pixel_valid ? 2'd1 : 2'd0;
+            2'd1: pix_count <= pixel_valid ? 2'd2 : 2'd1;
+            2'd2: pix_count <= pixel_valid ? 2'd3 : 2'd2;
+            2'd3: pix_count <= save_done ? 2'd0 : 2'd3;
+            default: pix_count <= 2'd0;
+        endcase
     end
-endgenerate
+end
 
-always_ff @(posedge clk) begin
-    if (~rst_n || clear) begin
-        for (int i=0;i<4;i=i+1) begin
-            register[i] = 8'b0;
+// pack_valid logic
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        pack_valid <= 1'b0;
+    end else begin
+        if (pack_count == 2'd3) begin
+            pack_valid <= save_done ? 1'b0 : 1'b1;
         end
-        addr <= 2'b0;
-    end else if (in_valid) begin
-        register[addr] <= in_data[7:0];
-        addr <= addr + 1;
+    end
+end
+
+// save_done_sim logic
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        save_done_sim <= 1'b0;
+    end else begin
+        if (pix_count < 2'd3) begin
+            save_done_sim <= pixel_valid ? 1'b1: 1'b0;
+        end else begin
+            save_done_sim <= save_done ? 1'b1 : 1'b0;
+        end
+    end
+end
+
+// pack_out_data logic
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        pack_out_data <= 32'd0;
+    end else begin
+        case (pix_count)
+            2'd0: pack_out_data[7:0] <= in_data;
+            2'd1: pack_out_data[15:8] <= in_data;
+            2'd2: pack_out_data[23:16] <= in_data;
+            2'd3: pack_out_data[31:24] <= in_data;
+            default: pack_out_data <= 32'd0;
+        endcase
     end
 end
 
