@@ -14,7 +14,7 @@ module cir_reg_w # (
     logic [7:0] register [0:K_H-1][0:K_W-1];
 
     // load input data into circular register
-    always_ff @(posedge clk or negedge rst_n) begin
+    always_ff @(posedge clk) begin
         if (!rst_n || clear) begin
             for (int i=0;i<K_H;i=i+1) begin
                 for (int j=0;j<K_W;j=j+1) begin
