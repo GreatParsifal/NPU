@@ -172,13 +172,6 @@ module npu #(
     // main
     logic done_reg;
     logic host_next_state;
-
-    assign host_trigger = (sel == 3'b100) ? dina[0] : 1'b0;
-    assign host_next_state = (sel == 3'b100) ? dina[1] : 1'b0;
-    assign host_pe_clear = (sel == 3'b100) ? dina[2] : 1'b0;
-    assign host_img_clear = (sel == 3'b100) ? dina[3] : 1'b0;
-    assign host_conv_w_clear = (sel == 3'b100) ? dina[4] : 1'b0;
-    assign host_pack_clear = (sel == 3'b100) ? dina[5] : 1'b0;
     
     // main FSM
     always_ff @(posedge clk or posedge rst) begin
@@ -298,9 +291,21 @@ module npu #(
                     fcn_in[31:24] <= dina[31:24];
                 end
                 3'b100: begin
-                    // trigger and clear signals
+                    host_trigger = dina[0];
+                    host_next_state = dina[1];
+                    host_pe_clear = dina[2];
+                    host_img_clear = dina[3];
+                    host_conv_w_clear = dina[4];
+                    host_pack_clear = dina[5];
                 end
-                default: ;
+                default: begin
+                    host_trigger = 1'b0;
+                    host_next_state = 1'b0;
+                    host_pe_clear = 1'b0;
+                    host_img_clear = 1'b0;
+                    host_conv_w_clear = 1'b0;
+                    host_pack_clear = 1'b0;
+                end
             endcase
         end
         else if (host_rea) begin
