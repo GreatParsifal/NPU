@@ -32,8 +32,8 @@ module npu #(
 
     logic signed [7:0] in_conv_w [0:K_H-1];
     logic signed [7:0] conv_w   [0:K_H-1];
-    logci host_conv_w_clear;
-    logic conv_w_shift;
+    logic host_conv_w_clear;
+    logic w_shift;
 
     logic signed [23:0] pe_out[0:K_H-1];
     logic signed [23:0] pe_sum;
@@ -61,7 +61,7 @@ module npu #(
         .load_en(sel == 3'b010 && host_wea),
         .in_data(in_conv_w),
         .out_data1(conv_w),
-        .shift(conv_w_shift)
+        .shift(w_shift)
     );
 
     // conv output package module
