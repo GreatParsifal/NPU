@@ -42,7 +42,6 @@ module cir_reg_w # (
     generate
         for (gi=0;gi<K_H;gi=gi+1) begin : gen_out_data
             assign out_data1[gi] = register[gi][0];
-            assign out_data2[gi] = register[gi][K_W-1];
         end
     endgenerate
 
