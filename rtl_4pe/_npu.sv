@@ -40,10 +40,11 @@ module npu #(
     logic host_trigger, minus_trigger;
 
     // fcn layer
-    logic [31:0] fcn_input;
+    logic [31:0] fcn_in;
 
     // addra decode
     wire [2:0] sel = addra[14:12];
+    logic host_wea;
 
     // weight and input circular register
     cir_reg_img #(K_H, K_W) img (
@@ -241,7 +242,6 @@ module npu #(
 
     // cpu interface
 
-    logic host_wea;
     assign host_wea = rst ? 1'b0 : (ena & wea);
     logic host_rea;
     assign host_rea = rst ? 1'b0 : (ena & ~wea);
