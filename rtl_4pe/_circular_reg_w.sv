@@ -18,7 +18,7 @@ module cir_reg_w # (
         if (!rst_n || clear) begin
             for (int i=0;i<K_H;i=i+1) begin
                 for (int j=0;j<K_W;j=j+1) begin
-                    in_conv[i][j] <= 8'd0;
+                    register[i][j] <= 8'd0;
                 end
             end
         end else if (shift) begin
@@ -41,8 +41,8 @@ module cir_reg_w # (
     genvar gi;
     generate
         for (gi=0;gi<K_H;gi=gi+1) begin : gen_out_data
-            assign out_data1[gi] = reg[gi][0];
-            assign out_data2[gi] = reg[gi][K_W-1];
+            assign out_data1[gi] = register[gi][0];
+            assign out_data2[gi] = register[gi][K_W-1];
         end
     endgenerate
 
