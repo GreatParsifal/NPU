@@ -100,7 +100,7 @@ module npu #(
     assign pe_sum = pe_out[0] + pe_out[1] + pe_out[2];
 
     //control FSM
-    typedef enum logic [2:0] {
+    typedef enum logic [3:0] {
         S_IDLE,
         S_CONV1_LD,  // load parameters
         S_CONV1_CAL, // calculate
@@ -265,7 +265,7 @@ module npu #(
                 result_sel[23:16] = pe_out[0][23] ? 8'b0 : pe_out[0][23:16];
                 result_sel[31:24] = 8'b0;
             end
-            S_FCN1_LAST: result_sel = pe_sum[23] ? 32'b0 : {24'b0, pe_sum[7:0]};
+            S_FCN_LAST: result_sel = pe_sum[23] ? 32'b0 : {24'b0, pe_sum[7:0]};
             default: result_sel = 32'b0;
         endcase
     end
