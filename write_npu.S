@@ -1,186 +1,85 @@
-    lui   t0, 0x70001
-    addi  t0, t0, 0      # base img_in = 0x70001
-
-    lui   t1, 0x60000
-    addi  t1, t1, 0      # base dcache = 0x600000
-
-    li    t3, 60         # cnt
-conv1_loop:
-    beqz  t3, conv1_done
-    lw    t2, 0(t1)
-    sw    t2, 0(t0)
-    addi  t1, t1, 4      
-    addi  t0, t0, 1      
-    addi  t3, t3, -1
-    j     conv1_loop
-conv1_done:
-	
+    lui   s0, 0x70001    
+    addi  s0, s0, 0      # base img_in 
     
-    li    t4, 10            # count of channels
-    lui   s0, 0x60000
-    addi  s0, s0, 2000
-c1_loop:
-	li    t3, 3
-    beqz  t4, c1_done
-    lui   t0,0x70002
-    addi  t0, t0, 0
-w1_loop:
-    beqz  t3, w1_done
-    lw    t2, 0(t1)
-    sw    t2, 0(t0)
-    addi  t1, t1, 4
-    addi  t0, t0, 1
-    addi  t3, t3, -1  
-    j     w1_loop
-w1_done:
+    lui   s1, 0x70002    
+    addi  s1, s1, 0      # base weight_conv1
+
+    lui   s1, 0x60000
+    addi  s1, s1, 0      # base image = 0x600000
+
+    lui   s2, 0x600F0
+    addi  s2, s2, 0      # base conv_weight = 0x600F00
+
+    lui   s3, 0x60000
+    addi  s3, s3, 2000   # base save = 0x6007D0
+
+    li    t3, 10         # channel_cnt
+conv1_chan_loop:
+    beqz  t3, conv1_chan_done
     lui   t5, 0x70005
-    li    t6, 1
-    sw    t6, 0(t5)         # trigger signal
-    li    t3, 182
-    
-k1_loop:
-    beqz  t3, k1_done   
-    addi  t3, t3, -1    # push the data
-    lui   t5, 0x70007
-    addi  t5, t5, 8
-    poll_valid:
-    lw    t6, 0(t5)
-    beqz  t6, poll_valid    # wait until valid
-    lui   t5, 0x70007
-    addi  t5, t5, 12
-    lw    t6, 0(t5)         # read the output
-    sw    t6, 0(s0)         # save the output
-    addi  s0, s0, 1
-    lui   t5, 0x70005
-    li    t6, 4
-    sw    t6, 0(t5)         # save_done
-    j     k1_loop
-k1_done:
+    li    t6, 16
+    sw    t6, 0(t5)         # clear weight signal
+    li    t4, 3
+w_conv1_loop:
+    beqz  t4, w_conv1_done
+    lw    t2, 0(s2)
+    sw    t2, 0(s1)
+    addi  s2, s2, 3
     addi  t4, t4, -1
-    j     c1_loop
-c1_done:
-
-    lui   t5, 0x70005
-    li    t6, 8
-    sw    t6, 0(t5)         # next layer signal
-    li    t4, 10            # count of channels
-    lui   s0, 0x60000
-    addi  s0, s0, 2000
-c2_loop:
-	li    t3, 3
-    beqz  t4, c2_done
-    lui   t0, 0x70002
-    addi  t0, t0, 0
-w2_loop:
-    beqz  t3, w2_done
-    lw    t2, 0(t1)
-    sw    t2, 0(t0)
-    addi  t1, t1, 4
-    addi  t0, t0, 1
-    addi  t3, t3, -1  
-    j     w2_loop
-w2_done:
-    li    t3, 45
-    lui   t5, 0x70001
-in_loop:
-    beqz  t3, in_done
+    j     w_conv1_loop      # load weights
+w_conv1_done:
+    li    t4, 2
+    li    t0, 14            # column_cnt
+conv1_col_loop:             # column loop
+inn_conv1_loop:
+    beqz  t0, conv1_col_done
+    beqz  t4, inn_conv1_done
     lw    t2, 0(s0)
-    sw    t2, 0(t5)
-    addi  t5, t5, 1
-    addi  s0, s0, 4
-    addi  t3, t3, -1
-    j     in_loop
-in_done:
-    lw    t2, 0(s0)
-    sw    t2, 0(t5)
-    addi  t5, t5, 1
-    addi  s0, s0, 2
-    lui   t5, 0x70005
+    sw    t2, 0(s1)         # load input
+    addi  s0, s0, 3
+    addi  t4, t4, -1
+    li    t5, 0x70005
     li    t6, 1
     sw    t6, 0(t5)         # trigger signal
-    li    t3, 132
-    lui   t2, 0x60000
-    addi  t2, t2, 2000
-k2_loop:
-    beqz  t3, k2_done   
-    addi  t3, t3, -1    # push the data
     lui   t5, 0x70007
-    addi  t5, t5, 8
     poll_valid2:
     lw    t6, 0(t5)
     beqz  t6, poll_valid2    # wait until valid
-   
-    lui   t5, 0x70005
-    li    t6, 4
-    sw    t6, 0(t5)         # save_done
-    j     k2_loop
-k2_done:
+    j     inn_conv1_loop    # load 2 input at first
+inn_conv1_done:
+    li    t1, 4             # readout cnt
+    li    t4, 13            # row cnt
+conv1_row_loop:
+    beqz  t4, conv1_row_done
+    lw    t2, 0(s0)
+    sw    t2, 0(s1)         # load input
+    addi  s0, s0, 3
     addi  t4, t4, -1
-    j     c2_loop
-c2_done:
-    lui   t5, 0x70005
-    li    t6, 8
-    sw    t6, 0(t5)         # next layer signal
-
-    lui   t0,0x70003
-    addi  t0, t0, 0
-    li    t3, 3
-f1_loop:
-    beqz  t3, f1_done
-    li    t4, 33
-wfc1_loop:
-    beqz  t4, wfc1_done
-    lw    t2, 0(t1)
-    sw    t2, 0(t0)
-    addi  t1, t1, 4     
-    addi  t0, t0, 1      
-    addi  t4, t4, -1
-    j     wfc1_loop
-wfc1_done:
-    lui   t5, 0x70005
-    li    t6, 16
+    li    t5, 0x70005
+    li    t6, 1
     sw    t6, 0(t5)         # trigger signal
     lui   t5, 0x70007
-    addi  t5, t5, 16
-    poll_fcn:
+    poll_valid1:
     lw    t6, 0(t5)
-    beqz  t6, poll_fcn    # wait until valid
-    lui   t5, 0x70005
-    li    t6, 2
-    sw    t6, 0(t5)         # next
-    addi  t3, t3, -1
-    j     f1_loop
-f1_done:
+    beqz  t6, poll_valid1    # wait until valid
 
-    lui   t0, 0x70004
-    addi  t0, t0, 0
-    li    t3, 3
-f2_loop:
-    beqz  t3, f2_done
-    lw    t2, 0(t1)
-    sw    t2, 0(t0)
-    addi  t1, t1, 4     
-    addi  t0, t0, 1     
+    beqz  t1, jump_readout
+    lui   t5, 0x70006
+    lw    t6, 0(t5)         # read the output
+    sw    t6, 0(s3)         # save the output
+    addi  s3, s3, 4
+jump_readout:
+    addi  t1, t1, -1
+    j     conv1_row_loop
+conv1_row_done:
+    addi  t0, t0, -1
+    j     conv1_col_loop
+conv1_col_done:
     addi  t3, t3, -1
-    j     f2_loop
-f2_done:
-    
-    
-poll_done:
-    lui   t0, 0x70007    
-    addi  t0, t0, 20
-    li    t2, 0
-    lw    t2, 0(t0)      
-    beqz  t2, poll_done
+    j     conv1_chan_loop
+conv1_chan_done:
+	
 
-   
-    lui   t0, 0x70007   
-    addi  t0, t0, 4
-    lw    t2, 0(t0)
-    lui   t4, 0x60000
-    addi  t4, t4, 1999
-	sw    t2, 0(t4)
-    
 stop:
     j     stop
     
