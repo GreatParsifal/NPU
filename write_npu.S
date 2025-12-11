@@ -5,15 +5,15 @@
     addi  t1, t1, 0      # base dcache = 0x600000
 
     li    t3, 60         # cnt
-img_loop:
-    beqz  t3, img_done
+conv1_loop:
+    beqz  t3, conv1_done
     lw    t2, 0(t1)
     sw    t2, 0(t0)
     addi  t1, t1, 4      
     addi  t0, t0, 1      
     addi  t3, t3, -1
-    j     img_loop
-img_done:
+    j     conv1_loop
+conv1_done:
 	
     
     li    t4, 10            # count of channels

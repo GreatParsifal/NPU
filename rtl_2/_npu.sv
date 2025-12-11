@@ -43,7 +43,7 @@ module npu #(
     logic [31:0] fcn_input;
 
     // addra decode
-    wire [2:0] sel = addra[2:0];
+    wire [2:0] sel = addra[14:12];
 
     // weight and input circular register
     cir_reg_img #(K_H, K_W) img (
@@ -292,9 +292,9 @@ module npu #(
         end
         else if (host_rea) begin
             unique case (sel)
-		        3'd1: douta <= {31'd0, done_reg};
-                3'd2: douta <= result_sel;
-                3'd3: douta <= {31'd0, valid_reg};
+		        3'd5: douta <= {31'd0, done_reg};
+                3'd6: douta <= result_sel;
+                3'd7: douta <= {31'd0, valid_reg};
                 default: douta <= 32'd0;
             endcase
         end
