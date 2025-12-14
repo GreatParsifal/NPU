@@ -26,8 +26,8 @@ module npu #(
 
     //conv layer
     logic [7:0] in_img  [0:K_H-1]; // interface
-    logic signed [8:0] img_pos[0:K_H-1];
-    logic signed [8:0] img_neg[0:K_H-1];
+    logic signed [7:0] img_pos[0:K_H-1];
+    logic signed [7:0] img_neg[0:K_H-1];
     logic host_img_clear;
 
     logic signed [7:0] in_conv_w [0:K_H-1];
@@ -50,6 +50,7 @@ module npu #(
     cir_reg_img #(K_H, K_W) img (
         .clk(clk),
         .rst_n(rst_ni),
+        .clear(host_img_clear),
         .load_en(sel == 3'b001 && host_wea),
         .in_data(in_img),
         .out_data1(img_pos),
@@ -59,6 +60,7 @@ module npu #(
     cir_reg_w #(K_H, K_W) weight (
         .clk(clk),
         .rst_n(rst_ni),
+        .clear(host_conv_w_clear),
         .load_en(sel == 3'b010 && host_wea),
         .in_data(in_conv_w),
         .out_data1(conv_w),
@@ -68,7 +70,7 @@ module npu #(
     // conv output package module
     logic valid_reg;
     logic host_pack_clear;
-    logic conv1_out_pack;
+    logic [31:0] conv1_out_pack;
     logic [23:0] result_reg;
     pack conv_out_pack (
         .clk(clk),
@@ -82,6 +84,7 @@ module npu #(
     // pe generate
     logic signed [8:0] pe_input_sel [0:K_H-1];
     logic signed [7:0] pe_w_sel [0:K_H-1];
+    logic host_pe_clear;
     genvar gi;
     generate
         for (gi = 0; gi < K_H; gi = gi + 1) begin : PE_GEN
@@ -169,13 +172,6 @@ module npu #(
     // main
     logic done_reg;
     logic host_next_state;
-
-    assign host_trigger = (sel == 3'b100) ? dina[0] : 1'b0;
-    assign host_next_state = (sel == 3'b100) ? dina[1] : 1'b0;
-    assign host_pe_clear = (sel == 3'b100) ? dina[2] : 1'b0;
-    assign host_img_clear = (sel == 3'b100) ? dina[3] : 1'b0;
-    assign host_conv_w_clear = (sel == 3'b100) ? dina[4] : 1'b0;
-    assign host_pack_clear = (sel == 3'b100) ? dina[5] : 1'b0;
     
     // main FSM
     always_ff @(posedge clk or posedge rst) begin
@@ -276,9 +272,6 @@ module npu #(
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
-            host_img_clear <= 1'b1;
-            host_pe_clear <= 1'b1;
-            host_conv_w_clear <= 1'b1;
         end else if (host_wea) begin
             unique case (sel)
                 3'b001: begin
@@ -298,9 +291,21 @@ module npu #(
                     fcn_in[31:24] <= dina[31:24];
                 end
                 3'b100: begin
-                    // trigger and clear signals
+                    host_trigger = dina[0];
+                    host_next_state = dina[1];
+                    host_pe_clear = dina[2];
+                    host_img_clear = dina[3];
+                    host_conv_w_clear = dina[4];
+                    host_pack_clear = dina[5];
                 end
-                default: ;
+                default: begin
+                    host_trigger = 1'b0;
+                    host_next_state = 1'b0;
+                    host_pe_clear = 1'b0;
+                    host_img_clear = 1'b0;
+                    host_conv_w_clear = 1'b0;
+                    host_pack_clear = 1'b0;
+                end
             endcase
         end
         else if (host_rea) begin
