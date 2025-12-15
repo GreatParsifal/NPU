@@ -13,7 +13,7 @@
     lui   s3, 0x60000
     addi  s3, s3, 2000   # base save = 0x6007D0
 
-    li    s5, 0x600009C4
+    # li    s5, 0x600009C4
 
     li    t3, 10         # channel_cnt
 conv1_chan_loop:
@@ -60,7 +60,7 @@ conv1_row_loop:
     sw    t2, 0(s0)         # load input
     addi  s4, s4, 3
     addi  t4, t4, -1
-    li    t5, 0x70004
+    lui    t5, 0x70004
     li    t6, 1
     sw    t6, 0(t5)         # trigger signal
     lui   t5, 0x70007
@@ -134,7 +134,7 @@ conv2_row_loop:
     addi  s3, s3, 3
     addi  s4, s4, 3
     addi  t4, t4, -1
-    li    t5, 0x70004
+    lui    t5, 0x70004
     li    t6, 1
     sw    t6, 0(t5)         # trigger signal
     lui   t5, 0x70007
@@ -179,7 +179,7 @@ fcn1_input_loop:
     lw    t2, 0(s2)
     sw    t2, 0(s1)       # load weight
     addi  s2, s2, 3
-    li    t5, 0x70004
+    lui    t5, 0x70004
     li    t6, 1
     sw    t6, 0(t5)         # trigger signal
     addi  t1, t1, -1
@@ -203,13 +203,13 @@ fcn1_input_loop2:
     lw    t2, 0(s2)
     sw    t2, 0(s1)       # load weight
     addi  s2, s2, 2
-    li    t5, 0x70004
+    lui    t5, 0x70004
     li    t6, 1
     sw    t6, 0(t5)         # trigger signal
     addi  t1, t1, -1
     j     fcn1_input_loop2
 fcn1_input_done2:
-    li    t5, 0x70006
+    lui   t5, 0x70006
     lw    t6, 0(t5)         # read the output
     sw    t6, 0(s3)         # save the output
     addi  s3, s3, 1

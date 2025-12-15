@@ -37,7 +37,7 @@ module npu #(
 
     logic signed [23:0] pe_out[0:K_H-1];
     logic signed [23:0] pe_sum;
-    logic host_trigger, minus_trigger;
+    logic host_trigger, pe_ready;
 
     // fcn layer
     logic [31:0] fcn_in;
@@ -112,7 +112,7 @@ module npu #(
                 .clk(clk),
                 .rst_n(rst_ni),
                 .clr(host_pe_clear),
-                .ready(host_trigger||minus_trigger),
+                .ready(pe_ready),
                 .in_data1(pe_w_sel[gi]),
                 .in_data2(pe_input_sel[gi]),
                 .outdata(pe_out[gi])
@@ -126,9 +126,13 @@ module npu #(
     typedef enum logic [3:0] {
         S_IDLE,
         S_CONV1_LD,  // load parameters
+        S_CONV1_PRE_CAL1, // first and second cycle for the first conv_win
+        S_CONV1_PRE_CAL2,
         S_CONV1_CAL, // calculate
         S_CONV1_MINUS,
         S_CONV2_LD,
+        S_CONV2_PRE_CAL1,
+        S_CONV2_PRE_CAL2,
         S_CONV2_CAL,
         S_CONV2_MINUS,
         S_FCN,
@@ -213,19 +217,20 @@ module npu #(
                     if (host_trigger) begin
                         valid_reg <= 1'b0;
                         state <= S_CONV1_CAL;
+                        w_shift <= 1'b1;
+                        pe_ready <= 1'b1;
                     end
                 end
                 S_CONV1_CAL: begin
                     result_reg <= (pe_sum[23]) ? 24'sd0 : pe_sum; // relu
                     valid_reg <= 1'b1;
                     state <= S_CONV1_MINUS;
-                    minus_trigger <= 1'b1;
-                    w_shift <= 1'b1;
+                    pe_ready <= 1'b1;
+                    w_shift <= 1'b0;
                 end
                 S_CONV1_MINUS: begin
-                    minus_trigger <= 1'b0;
+                    pe_ready <= 1'b0;
                     state <= S_CONV1_LD;
-                    w_shift <= 1'b0;
                 end
                 S_CONV2_LD: begin
                     if (host_next_state) begin
@@ -234,19 +239,19 @@ module npu #(
                     if (host_trigger) begin
                         valid_reg <= 1'b0;
                         state <= S_CONV2_CAL;
+                        w_shift <= 1'b1;
                     end
                 end
                 S_CONV2_CAL: begin
                     result_reg <= pe_sum; // no relu
                     valid_reg <= 1'b1;
                     state <= S_CONV2_MINUS;
-                    minus_trigger <= 1'b1;
-                    w_shift <= 1'b1;
+                    pe_ready <= 1'b1;
+                    w_shift <= 1'b0;
                 end
                 S_CONV2_MINUS: begin
-                    minus_trigger <= 1'b0;
+                    pe_ready <= 1'b0;
                     state <= S_CONV2_LD;
-                    w_shift <= 1'b0;
                 end
                 S_FCN: begin
                     if (host_next_state) begin
@@ -311,12 +316,12 @@ module npu #(
                     fcn_in[31:24] <= dina[31:24];
                 end
                 3'b100: begin
-                    host_trigger = dina[0];
-                    host_next_state = dina[1];
-                    host_pe_clear = dina[2];
-                    host_img_clear = dina[3];
-                    host_conv_w_clear = dina[4];
-                    host_pack_clear = dina[5];
+                    host_trigger <= dina[0];
+                    host_next_state <= dina[1];
+                    host_pe_clear <= dina[2];
+                    host_img_clear <= dina[3];
+                    host_conv_w_clear <= dina[4];
+                    host_pack_clear <= dina[5];
                 end
                 default: begin
                 end
@@ -330,12 +335,12 @@ module npu #(
                 default: douta <= 32'd0;
             endcase
         end else begin
-            host_trigger = 1'b0;
-            host_next_state = 1'b0;
-            host_pe_clear = 1'b0;
-            host_img_clear = 1'b0;
-            host_conv_w_clear = 1'b0;
-            host_pack_clear = 1'b0;
+            host_trigger <= 1'b0;
+            host_next_state <= 1'b0;
+            host_pe_clear <= 1'b0;
+            host_img_clear <= 1'b0;
+            host_conv_w_clear <= 1'b0;
+            host_pack_clear <= 1'b0;
         end
     end
 
