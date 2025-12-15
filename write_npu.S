@@ -36,6 +36,9 @@ conv1_col_loop:             # column loop
     lui   t5, 0x70004
     li    t6, 8
     sw    t6, 0(t5)         # clear input signal
+    lui   t5, 0x70004
+    li    t6, 4
+    sw    t6, 0(t5)         # clear pe signal
 inn_conv1_loop:
     beqz  t0, conv1_col_done
     beqz  t4, inn_conv1_done
@@ -54,6 +57,9 @@ inn_conv1_loop:
 inn_conv1_done:
     li    t1, 4             # readout cnt
     li    t4, 13            # row cnt
+    lui   t5, 0x70004
+    li    t6, 32
+    sw    t6, 0(t5)         # clear package signal
 conv1_row_loop:
     beqz  t4, conv1_row_done
     lw    t2, 0(s4)
@@ -67,14 +73,18 @@ conv1_row_loop:
     poll_valid2:
     lw    t6, 0(t5)
     beqz  t6, poll_valid2    # wait until valid
-
-    beqz  t1, jump_readout
+    addi  t1, t1, -1
+    beqz  t1, readout
+    j     conv1_row_loop
+readout:
     lui   t5, 0x70006
     lw    t6, 0(t5)         # read the output
     sw    t6, 0(s3)         # save the output
     addi  s3, s3, 4
-jump_readout:
-    addi  t1, t1, -1
+    lui   t5, 0x70004
+    li    t6, 32
+    sw    t6, 0(t5)         # clear package signal
+    li    t1, 4             # readout cnt reset
     j     conv1_row_loop
 conv1_row_done:
     addi  t0, t0, -1

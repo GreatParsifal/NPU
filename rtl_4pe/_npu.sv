@@ -151,9 +151,9 @@ module npu #(
                 pe_w_sel = conv_w;
             end
             S_CONV1_MINUS: begin
-                pe_input_sel[0] = {1'b0, img_neg[0]};
-                pe_input_sel[1] = {1'b0, img_neg[1]};
-                pe_input_sel[2] = {1'b0, img_neg[2]};
+                pe_input_sel[0] = ~{1'b0, img_neg[0]}+1'b1;
+                pe_input_sel[1] = ~{1'b0, img_neg[1]}+1'b1;
+                pe_input_sel[2] = ~{1'b0, img_neg[2]}+1'b1;
                 pe_w_sel = conv_w;
             end
             S_CONV2_CAL: begin
@@ -163,9 +163,9 @@ module npu #(
                 pe_w_sel = conv_w;
             end
             S_CONV2_MINUS: begin
-                pe_input_sel[0] = {1'b0, img_neg[0]};
-                pe_input_sel[1] = {1'b0, img_neg[1]};
-                pe_input_sel[2] = {1'b0, img_neg[2]};
+                pe_input_sel[0] = ~{1'b0, img_neg[0]}+1'b1;
+                pe_input_sel[1] = ~{1'b0, img_neg[1]}+1'b1;
+                pe_input_sel[2] = ~{1'b0, img_neg[2]}+1'b1;
                 pe_w_sel = conv_w;
             end
             S_FCN: begin // 1 input multiplied with weight from 3 channels
