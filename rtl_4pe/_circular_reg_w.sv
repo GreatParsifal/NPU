@@ -11,30 +11,30 @@ module cir_reg_w # (
     input logic                   shift
 );
 
-    logic [7:0] register [0:K_H-1][0:K_W-1];
+    logic [7:0] register_w [0:K_H-1][0:K_W-1];
     integer i, j;
 
-    // load input data into circular register
+    // load input data into circular register_w
     always_ff @(posedge clk) begin
         if (!rst_n || clear) begin
             for (i=0;i<K_H;i=i+1) begin
                 for (j=0;j<K_W;j=j+1) begin
-                    register[i][j] <= 8'd0;
+                    register_w[i][j] <= 8'd0;
                 end
             end
         end else if (shift) begin
-            for (i=K_H-1;i>0;i=i-1) begin
+            for (i=K_H-1;i>=0;i=i-1) begin
                 for (j=K_W-1;j>0;j=j-1) begin
-                    register[i][j] <= register[i][j-1];
+                    register_w[i][j] <= register_w[i][j-1];
                 end
-                register[i][0] <= register[i][K_W-1];
+                register_w[i][0] <= register_w[i][K_W-1];
             end
         end else if (load_en) begin
-            for (i=K_H-1;i>0;i=i-1) begin
+            for (i=K_H-1;i>=0;i=i-1) begin
                 for (j=K_W-1;j>0;j=j-1) begin
-                    register[i][j] <= register[i][j-1];
+                    register_w[i][j] <= register_w[i][j-1];
                 end
-                register[i][0] <= in_data[i];
+                register_w[i][0] <= in_data[i];
             end
         end
     end
@@ -42,7 +42,7 @@ module cir_reg_w # (
     genvar gi;
     generate
         for (gi=0;gi<K_H;gi=gi+1) begin : gen_out_data
-            assign out_data1[gi] = register[gi][0];
+            assign out_data1[gi] = register_w[gi][0];
         end
     endgenerate
 
