@@ -47,21 +47,41 @@ module npu #(
     logic host_wea;
 
     // weight and input circular register
+    logic img_load_en;
+    always_ff @(posedge clk) begin
+        if (rst) begin
+            img_load_en <= 1'b0;
+        end else if (sel == 3'b001 && host_wea) begin
+            img_load_en <= 1'b1;
+        end else begin
+            img_load_en <= 1'b0;
+        end
+    end
     cir_reg_img #(K_H, K_W) img (
         .clk(clk),
         .rst_n(rst_ni),
         .clear(host_img_clear),
-        .load_en(sel == 3'b001 && host_wea),
+        .load_en(img_load_en),
         .in_data(in_img),
         .out_data1(img_pos),
         .out_data2(img_neg)
     );
 
+    logic w_load_en;
+    always_ff @(posedge clk) begin
+        if (rst) begin
+            w_load_en <= 1'b0;
+        end else if (sel == 3'b010 && host_wea) begin
+            w_load_en <= 1'b1;
+        end else begin
+            w_load_en <= 1'b0;
+        end
+    end
     cir_reg_w #(K_H, K_W) weight (
         .clk(clk),
         .rst_n(rst_ni),
         .clear(host_conv_w_clear),
-        .load_en(sel == 3'b010 && host_wea),
+        .load_en(w_load_en),
         .in_data(in_conv_w),
         .out_data1(conv_w),
         .shift(w_shift)
@@ -243,7 +263,7 @@ module npu #(
                     state <= S_IDLE;
                 end
                 
-                default: ;
+                default: state <= S_IDLE;
             endcase
         end
     end
@@ -299,12 +319,6 @@ module npu #(
                     host_pack_clear = dina[5];
                 end
                 default: begin
-                    host_trigger = 1'b0;
-                    host_next_state = 1'b0;
-                    host_pe_clear = 1'b0;
-                    host_img_clear = 1'b0;
-                    host_conv_w_clear = 1'b0;
-                    host_pack_clear = 1'b0;
                 end
             endcase
         end
@@ -315,6 +329,13 @@ module npu #(
                 3'd7: douta <= {31'd0, valid_reg};
                 default: douta <= 32'd0;
             endcase
+        end else begin
+            host_trigger = 1'b0;
+            host_next_state = 1'b0;
+            host_pe_clear = 1'b0;
+            host_img_clear = 1'b0;
+            host_conv_w_clear = 1'b0;
+            host_pack_clear = 1'b0;
         end
     end
 
