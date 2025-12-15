@@ -194,8 +194,8 @@ fcn1_input_done:
 last_fcn1:
 
     li    t1, 132   # fc1 input cnt
-fcn1_input_loop:
-    beqz  t1, fcn1_input_done
+fcn1_input_loop2:
+    beqz  t1, fcn1_input_done2
     lui   t5, 0x70003
     lw    t2, 0(s5)
     sw    t2, 0(t5)       # load input
@@ -207,8 +207,8 @@ fcn1_input_loop:
     li    t6, 1
     sw    t6, 0(t5)         # trigger signal
     addi  t1, t1, -1
-    j     fcn1_input_loop
-fcn1_input_done:
+    j     fcn1_input_loop2
+fcn1_input_done2:
     li    t5, 0x70006
     lw    t6, 0(t5)         # read the output
     sw    t6, 0(s3)         # save the output
@@ -218,8 +218,9 @@ fcn1_input_done:
     li    t0, 5
 fcn2_loop:
     beqz  t0, fcn2_done
+    lui   t5, 0x70003
     lw    t2, 0(s3)
-    sw    t2, 0()           # load input
+    sw    t2, 0(t5)         # load input
     addi  s3, s3, 2
     lw    t2, 0(s2)
     sw    t2, 0(s1)         # load weight
