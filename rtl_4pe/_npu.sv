@@ -280,6 +280,7 @@ module npu #(
     logic host_rea;
     assign host_rea = rst ? 1'b0 : (ena & ~wea);
     logic [31:0] result_sel;
+    logic [31:0] result_tmp;
 
     always_comb begin : result_selection
         case(state)
@@ -292,7 +293,15 @@ module npu #(
                 result_sel[31:24] = 8'b0;
             end
             S_FCN_LAST: result_sel = pe_sum[23] ? 32'b0 : {24'b0, pe_sum[7:0]};
-            default: result_sel = 32'b0;
+            default: result_sel = 32'd0;
+        endcase
+
+        case(state)
+            S_CONV1_CAL: result_tmp = result_sel;
+            S_CONV2_CAL: result_tmp = result_sel;
+            S_FCN: result_tmp = result_sel;
+            S_FCN_LAST: result_tmp = result_sel;
+            default;
         endcase
     end
 
@@ -331,7 +340,7 @@ module npu #(
         else if (host_rea) begin
             unique case (sel)
 		        3'd5: douta <= {31'd0, done_reg};
-                3'd6: douta <= result_sel;
+                3'd6: douta <= result_tmp;
                 3'd7: douta <= {31'd0, valid_reg};
                 default: douta <= 32'd0;
             endcase
