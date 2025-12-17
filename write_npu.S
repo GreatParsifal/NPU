@@ -315,11 +315,12 @@ fcn1_input_done:
     li    t6, 4
     sw    t6, 0(t5)         # clear pe signal
 
+    j     fcn1_loop
+last_fcn1:
     lui    t5, 0x70004
     li    t6, 2
     sw    t6, 0(t5)         # host_next_state signal
-    j     fcn1_loop
-last_fcn1:
+
     lui   s5, 0x60000       # input addr base
     addi  s5, s5, 2000
     addi  s5, s5, 2000
