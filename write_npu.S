@@ -248,23 +248,45 @@ conv2_col_done:
     j     conv2_chan_loop
 conv2_chan_done:
 
-    lui   s3, 0x60000
+    lui   t5, 0x70004
+    li    t6, 2
+    sw    t6, 0(t5)         # host_next_state signal
+
+    lui   s4, 0x60000       # addr base for w_fcn1
+    addi  s4, s4, 420
+    
+    lui   s3, 0x60000       # save addr base for fcn
     addi  s3, s3, 2000
-    addi  s3, s3, 1000
-    li    s5, 0x600009C4
+    addi  s3, s3, 2000
+    addi  s3, s3, 200
+
+    lui   t5, 0x70004
+    li    t6, 4
+    sw    t6, 0(t5)         # clear pe signal
+
     li    t0, 3       # group cnt
 fcn1_loop:
     beqz  t0, last_fcn1
+
+    lui   s5, 0x60000       # input addr base
+    addi  s5, s5, 2000
+    addi  s5, s5, 2000
+
     li    t1, 132   # fc1 input cnt
 fcn1_input_loop:
     beqz  t1, fcn1_input_done
-    lui   t5, 0x70003
+    # writing fcn_in                           ### w_fcn1 saving should be
+    lui   t5, 0x70003     # fcn_in addr
     lw    t2, 0(s5)
-    sw    t2, 0(t5)       # load input
+    sll   t2, t2, 24      # get one input and put it to [31:24]
     addi  s5, s5, 1
-    lw    t2, 0(s2)
-    sw    t2, 0(s1)       # load weight
-    addi  s2, s2, 3
+    addi  t3, s4, -1      # let w_fcn1 [0:2][7:0] be [31:8]
+    lw    t4, 0(t3)
+    srl   t4, t4, 8       # remove useless bits
+    add   t2, t2, t4      # add w_fcn1 to fcn_in
+    addi  s4, s4, 3
+    sw    t2, 0(t5)       # load input
+
     lui    t5, 0x70004
     li    t6, 1
     sw    t6, 0(t5)         # trigger signal
@@ -275,20 +297,34 @@ fcn1_input_done:
     lw    t6, 0(t5)         # read the output
     sw    t6, 0(s3)         # save the output
     addi  s3, s3, 3
-    addi  t0, t0, -1
-    j fcn1_input_loop
-last_fcn1:
 
-    li    t1, 132   # fc1 input cnt
+    addi  t0, t0, -1        # group cnt -1
+
+    lui    t5, 0x70004
+    li    t6, 4
+    sw    t6, 0(t5)         # clear pe signal
+    j fcn1_loop
+last_fcn1:
+    lui   s5, 0x60000       # input addr base
+    addi  s5, s5, 2000
+    addi  s5, s5, 2000
+
+    li    t1, 66   # fc1 last input cnt
 fcn1_input_loop2:
     beqz  t1, fcn1_input_done2
-    lui   t5, 0x70003
+    
+    # writing fcn_in                           ### w_fcn1 saving should be
+    lui   t5, 0x70003     # fcn_in addr
     lw    t2, 0(s5)
-    sw    t2, 0(t5)       # load input
+    sll   t2, t2, 16      # get one input and put it to [31:16]
     addi  s5, s5, 2
-    lw    t2, 0(s2)
-    sw    t2, 0(s1)       # load weight
-    addi  s2, s2, 2
+    addi  t3, s4, -2      # let w_fcn1 [0:2][7:0] be [31:16]
+    lw    t4, 0(t3)
+    srl   t4, t4, 8       # remove useless bits
+    add   t2, t2, t4      # add w_fcn1 to fcn_in
+    addi  s4, s4, 2
+    sw    t2, 0(t5)       # load input
+
     lui    t5, 0x70004
     li    t6, 1
     sw    t6, 0(t5)         # trigger signal
@@ -301,23 +337,30 @@ fcn1_input_done2:
     addi  s3, s3, 1
 
     addi  s3, s3, -10
-    li    t0, 5
+    li    t0, 5             # fcn_2 cal cnt
 fcn2_loop:
     beqz  t0, fcn2_done
-    lui   t5, 0x70003
+    
+    # writing fcn_in                           ### w_fcn1 saving should be
+    lui   t5, 0x70003     # fcn_in addr
     lw    t2, 0(s3)
-    sw    t2, 0(t5)         # load input
+    sll   t2, t2, 16      # get one input and put it to [31:16]
     addi  s3, s3, 2
-    lw    t2, 0(s2)
-    sw    t2, 0(s1)         # load weight
-    addi  s2, s2, 2
-    addi  t0, t0, -1 
+    addi  t3, s4, -2      # let w_fcn1 [0:2][7:0] be [31:16]
+    lw    t4, 0(t3)
+    srl   t4, t4, 8       # remove useless bits
+    add   t2, t2, t4      # add w_fcn2 to fcn_in
+    addi  s4, s4, 2
+    sw    t2, 0(t5)       # load input
+
+    addi  t0, t0, -1
+    j     fcn2_loop
 fcn2_done:
     lui   t5, 0x70006
     lui   s3, 0x60000
     addi  s3, s3, 2000
-    addi  s3, s3, 1000
-    addi  s3, s3, 100
+    addi  s3, s3, 2000
+    addi  s3, s3, 300
     lw    t6, 0(t5)         # read the output
     sw    t6, 0(s3)         # save the output
 stop:
