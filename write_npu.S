@@ -235,16 +235,16 @@ conv2_row_loop:
     lw    t5, 0(s5)         # load previous sum
     add   t6, t6, t5        # accumulate
     li    t1, 1            # last time relu
-    beq   t3, t1, relu
+    beq   t3, t1, conv2_relu
 jump_add:
     sw    t6, 0(s5)         # save the output
     addi  s5, s5, 4
     j     conv2_row_loop
-relu:
+conv2_relu:
     srl   t5, t6, 31
-    beqz  t5, jump_relu     # if t5 == 0, t6 is positive
+    beqz  t5, conv2_jump_relu     # if t5 == 0, t6 is positive
     lui   t6, 0x00000
-jump_relu:
+conv2_jump_relu:
     sw    t6, 0(s5)
     addi  s5, s5, 4
     j     conv2_row_loop
@@ -279,18 +279,18 @@ conv2_chan_done:
 fcn1_loop:
     beqz  t0, last_fcn1
 
-    lui   s5, 0x60000       # input addr base
+    lui   s5, 0x60000       # input addr base, note that only [7:0] is useful in [31:0]
     addi  s5, s5, 2000
     addi  s5, s5, 2000
 
     li    t1, 132   # fc1 input cnt
 fcn1_input_loop:
     beqz  t1, fcn1_input_done
-    # writing fcn_in                           ### w_fcn1 saving should be
+    # writing fcn_in                           ### w_fcn1 distributing should be modified
     lui   t5, 0x70003     # fcn_in addr
     lw    t2, 0(s5)
     sll   t2, t2, 24      # get one input and put it to [31:24]
-    addi  s5, s5, 1
+    addi  s5, s5, 4
     addi  t3, s4, -1      # let w_fcn1 [0:2][7:0] be [31:8]
     lw    t4, 0(t3)
     srl   t4, t4, 8       # remove useless bits
@@ -324,14 +324,19 @@ last_fcn1:
 fcn1_input_loop2:
     beqz  t1, fcn1_input_done2
     
-    # writing fcn_in                           ### w_fcn1 saving should be
+    # writing fcn_in                           ### w_fcn1 distributing should be modified
     lui   t5, 0x70003     # fcn_in addr
     lw    t2, 0(s5)
-    sll   t2, t2, 16      # get one input and put it to [31:16]
-    addi  s5, s5, 2
+    sll   t2, t2, 24      # get one input and put it to [31:24]
+    addi  s5, s5, 4
+    lw    t4, 0(s5)
+    sll   t4, t4, 24
+    srl   t4, t4, 8       # move second input to [23:16]
+    add   t2, t2, t4
+    addi  s5, s5, 4
     addi  t3, s4, -2      # let w_fcn1 [0:2][7:0] be [31:16]
     lw    t4, 0(t3)
-    srl   t4, t4, 8       # remove useless bits
+    srl   t4, t4, 16      # remove useless bits
     add   t2, t2, t4      # add w_fcn1 to fcn_in
     addi  s4, s4, 2
     sw    t2, 0(t5)       # load input
@@ -344,23 +349,36 @@ fcn1_input_loop2:
 fcn1_input_done2:
     lui   t5, 0x70006
     lw    t6, 0(t5)         # read the output
+    lw    t2, 0(s5)         # relu
+    beqz  t2, fcn1_jump_relu
+    lw    t6, 0x00000
+fcn1_jump_relu:
     sw    t6, 0(s3)         # save the output
     addi  s3, s3, 1
+fcn1_done:
+    lui    t5, 0x70004
+    li    t6, 4
+    sw    t6, 0(t5)         # clear pe signal
 
-    addi  s3, s3, -10
+    addi  s3, s3, -10       # fcn_2 input addr base
     li    t0, 5             # fcn_2 cal cnt
 fcn2_loop:
     beqz  t0, fcn2_done
     
-    # writing fcn_in                           ### w_fcn1 saving should be
+    # writing fcn_in                           ### w_fcn1 distributing should be modified
     lui   t5, 0x70003     # fcn_in addr
     lw    t2, 0(s3)
-    sll   t2, t2, 16      # get one input and put it to [31:16]
-    addi  s3, s3, 2
-    addi  t3, s4, -2      # let w_fcn1 [0:2][7:0] be [31:16]
+    sll   t2, t2, 24      # get one input and put it to [31:24]
+    addi  s3, s3, 1
+    lw    t4, 0(s3)
+    sll   t4, t4, 24
+    srl   t4, t4, 8       # move second input to [23:16]
+    add   t2, t2, t4
+    addi  s3, s3, 1
+    addi  t3, s4, -2      # let w_fcn2 [0:2][7:0] be [31:16]
     lw    t4, 0(t3)
-    srl   t4, t4, 8       # remove useless bits
-    add   t2, t2, t4      # add w_fcn2 to fcn_in
+    srl   t4, t4, 16      # remove useless bits
+    add   t2, t2, t4      # add w_fcn1 to fcn_in
     addi  s4, s4, 2
     sw    t2, 0(t5)       # load input
 
@@ -373,6 +391,7 @@ fcn2_done:
     addi  s3, s3, 2000
     addi  s3, s3, 300
     lw    t6, 0(t5)         # read the output
+    srl   t6, t6, 31        # cal result
     sw    t6, 0(s3)         # save the output
 stop:
     j     stop

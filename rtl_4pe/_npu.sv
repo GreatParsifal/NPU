@@ -296,7 +296,7 @@ module npu #(
             S_CONV1_LD: result_sel = conv1_out_pack;
             S_CONV1_CAL: result_sel = conv1_out_pack;
             S_CONV1_MINUS: result_sel = conv1_out_pack;
-            S_CONV2_LD: result_sel = {{8{result_reg[23]}}, result_reg};
+            S_CONV2_LD: result_sel = {{8{result_reg[23]}}, result_reg};            // relu in cpu
             S_CONV2_CAL: result_sel = {{8{result_reg[23]}}, result_reg};
             S_CONV2_MINUS: result_sel = {{8{result_reg[23]}}, result_reg};
             S_FCN: begin
@@ -305,7 +305,7 @@ module npu #(
                 result_sel[23:16] = pe_out[0][23] ? 8'b0 : pe_out[0][23:16];
                 result_sel[31:24] = 8'b0;
             end
-            S_FCN_LAST: result_sel = pe_sum[23] ? 32'b0 : {24'b0, pe_sum[7:0]};
+            S_FCN_LAST: result_sel = {{8{pe_sum[23]}}, pe_sum};       // relu in cpu
             default: result_sel = 32'd0;
         endcase
     end
