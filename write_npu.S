@@ -269,7 +269,7 @@ conv2_chan_done:
     lui   s3, 0x60000       # save addr base for fcn
     addi  s3, s3, 2000
     addi  s3, s3, 2000
-    addi  s3, s3, 200
+    addi  s3, s3, 600
 
     lui   t5, 0x70004
     li    t6, 4
@@ -393,7 +393,7 @@ fcn2_done:
     lui   s3, 0x60000
     addi  s3, s3, 2000
     addi  s3, s3, 2000
-    addi  s3, s3, 300
+    addi  s3, s3, 700
     lw    t6, 0(t5)         # read the output
     srl   t6, t6, 31        # cal result
     sw    t6, 0(s3)         # save the output
