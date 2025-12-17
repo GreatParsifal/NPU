@@ -351,7 +351,7 @@ fcn1_input_done2:
     lw    t6, 0(t5)         # read the output
     lw    t2, 0(s5)         # relu
     beqz  t2, fcn1_jump_relu
-    lw    t6, 0x00000
+    lui   t6, 0x00000
 fcn1_jump_relu:
     sw    t6, 0(s3)         # save the output
     addi  s3, s3, 1
