@@ -234,10 +234,21 @@ conv2_row_loop:
     beq   t3, t1, jump_add
     lw    t5, 0(s5)         # load previous sum
     add   t6, t6, t5        # accumulate
+    li    t1, 1            # last time relu
+    beq   t3, t1, relu
 jump_add:
     sw    t6, 0(s5)         # save the output
     addi  s5, s5, 4
     j     conv2_row_loop
+relu:
+    srl   t5, t6, 31
+    beqz  t5, jump_relu     # if t5 == 0, t6 is positive
+    lui   t6, 0x00000
+jump_relu:
+    sw    t6, 0(s5)
+    addi  s5, s5, 4
+    j     conv2_row_loop
+
 conv2_row_done:
     addi  t0, t0, -1
     j     conv2_col_loop
