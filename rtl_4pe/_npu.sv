@@ -296,9 +296,9 @@ module npu #(
             S_CONV1_LD: result_sel = conv1_out_pack;
             S_CONV1_CAL: result_sel = conv1_out_pack;
             S_CONV1_MINUS: result_sel = conv1_out_pack;
-            S_CONV2_LD: result_sel = {8{result_reg[23]}, result_reg};
-            S_CONV2_CAL: result_sel = {8{result_reg[23]}, result_reg};
-            S_CONV2_MINUS: result_sel = {8{result_reg[23]}, result_reg};
+            S_CONV2_LD: result_sel = {{8{result_reg[23]}}, result_reg};
+            S_CONV2_CAL: result_sel = {{8{result_reg[23]}}, result_reg};
+            S_CONV2_MINUS: result_sel = {{8{result_reg[23]}}, result_reg};
             S_FCN: begin
                 result_sel[7:0] = pe_out[0][23] ? 8'b0 : pe_out[0][7:0];
                 result_sel[15:8] = pe_out[0][23] ? 8'b0 : pe_out[0][15:8];
