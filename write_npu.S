@@ -304,7 +304,7 @@ fcn1_input_loop:
     addi  t1, t1, -1
     j     fcn1_input_loop
 fcn1_input_done:
-    li    t5, 0x70006
+    lui    t5, 0x70006
     lw    t6, 0(t5)         # read the output
     sw    t6, 0(s3)         # save the output
     addi  s3, s3, 3
@@ -318,7 +318,7 @@ fcn1_input_done:
     lui    t5, 0x70004
     li    t6, 2
     sw    t6, 0(t5)         # host_next_state signal
-    j fcn1_loop
+    j     fcn1_loop
 last_fcn1:
     lui   s5, 0x60000       # input addr base
     addi  s5, s5, 2000
