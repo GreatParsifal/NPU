@@ -220,7 +220,6 @@ module npu #(
                         state <= S_CONV1_CAL;
                         w_shift <= 1'b1;
                         pe_ready <= 1'b1;
-                        pack_valid <= 1'b1;
                     end
                 end
                 S_CONV1_CAL: begin
@@ -230,10 +229,11 @@ module npu #(
                     state <= S_CONV1_MINUS;
                     pe_ready <= 1'b1;
                     w_shift <= 1'b0;
-                    pack_valid <= 1'b0;
+                    pack_valid <= 1'b1;
                 end
                 S_CONV1_MINUS: begin
                     pe_ready <= 1'b0;
+                    pack_valid <= 1'b0;
                     state <= S_CONV1_LD;
                 end
                 S_CONV2_LD: begin
@@ -245,7 +245,6 @@ module npu #(
                         state <= S_CONV2_CAL;
                         w_shift <= 1'b1;
                         pe_ready <= 1'b1;
-                        pack_valid <= 1'b1;
                     end
                 end
                 S_CONV2_CAL: begin
@@ -254,9 +253,10 @@ module npu #(
                     state <= S_CONV2_MINUS;
                     pe_ready <= 1'b1;
                     w_shift <= 1'b0;
-                    pack_valid <= 1'b0;
+                    pack_valid <= 1'b1;
                 end
                 S_CONV2_MINUS: begin
+                    pack_valid <= 1'b0;
                     pe_ready <= 1'b0;
                     state <= S_CONV2_LD;
                 end
