@@ -119,8 +119,6 @@ readout:
     li    t1, 4             # readout cnt reset
     j     conv1_row_loop
 conv1_row_done:
-    addi  s4, s4, 15
-
     addi  t0, t0, -1
 
     lui   t5, 0x70006       # sel output
@@ -139,23 +137,17 @@ conv1_chan_done:            # finished conv1 calculation, conv2 start
     li    t6, 2
     sw    t6, 0(t5)         # host_next_state signal
 
-    lui   s2, 0x60000
-    addi  s2, s2, 332       # conv2 weight base addr
-
     lui   s4, 0x60000
-    addi  s4, s4, 2000      # conv2 input base addr
-
-    lui   s3, 0x60000
-    addi  s3, s3, 2000   
+    addi  s4, s4, 2000   
     li    t3, 10         # channel_cnt
 conv2_chan_loop:
     beqz  t3, conv2_chan_done
 
-    li    s5, 0x60000    # addr for conv1 result
-    li    s5, 2000
-    li    s5, 500
+    lui    s5, 0x60000    # addr for conv2 result
+    addi   s5, s5, 2000
+    addi   s5, s5, 2000
     li    t4, 2
-    li    t0, 14            # column_cnt
+    li    t0, 12            # column_cnt
 conv2_col_loop:             # column loop
     lui   t5, 0x70004
     li    t6, 16
@@ -175,18 +167,24 @@ w_conv2_done:
     lui   t5, 0x70004
     li    t6, 8
     sw    t6, 0(t5)         # clear input signal
+
+    lui   t5, 0x70004
+    li    t6, 4
+    sw    t6, 0(t5)         # clear pe signal
+
+    li    t4, 2             # set pre-load num
 inn_conv2_loop:
     beqz  t0, conv2_col_done
     beqz  t4, inn_conv2_done
     addi  t5, s4, -3
     lw    t2, 0(t5)         # in_img[0]
     srl   t2, t2, 24
-    addi  t5, t5, 15        # get in_img[1] to [31:24]
+    addi  t5, t5, 13        # get in_img[1] to [31:24]
     lw    t6, 0(t5)         # in_img[1]
     srl   t6, t6, 24
     sll   t6, t6, 8
     add  t2, t2, t6
-    addi  t5, t5, 15
+    addi  t5, t5, 13
     lw    t6, 0(t5)         # in_img[2]
     srl   t6, t6, 24
     sll   t6, t6, 16
@@ -203,19 +201,18 @@ inn_conv2_loop:
     beqz  t6, poll_valid3    # wait until valid
     j     inn_conv2_loop    # load 2 input at first
 inn_conv2_done:
-   
-    li    t4, 13            # row cnt
+    li    t4, 11            # row cnt
 conv2_row_loop:
     beqz  t4, conv2_row_done
     addi  t5, s4, -3
     lw    t2, 0(t5)         # in_img[0]
     srl   t2, t2, 24
-    addi  t5, t5, 15        # get in_img[1] to [31:24]
+    addi  t5, t5, 13        # get in_img[1] to [31:24]
     lw    t6, 0(t5)         # in_img[1]
     srl   t6, t6, 24
     sll   t6, t6, 8
     add  t2, t2, t6
-    addi  t5, t5, 15
+    addi  t5, t5, 13
     lw    t6, 0(t5)         # in_img[2]
     srl   t6, t6, 24
     sll   t6, t6, 16
@@ -237,18 +234,17 @@ conv2_row_loop:
     beq   t3, t1, jump_add
     lw    t5, 0(s5)         # load previous sum
     add   t6, t6, t5        # accumulate
-    sw    t6, 0(s5)         # save the output
-    addi  s5, s5, 4
 jump_add:
     sw    t6, 0(s5)         # save the output
     addi  s5, s5, 4
     j     conv2_row_loop
 conv2_row_done:
     addi  t0, t0, -1
-    addi  s4, s4, 13
     j     conv2_col_loop
 conv2_col_done:
     addi  t3, t3, -1
+    addi  s2, s2, 9
+    addi  s4, s4, 26
     j     conv2_chan_loop
 conv2_chan_done:
 
