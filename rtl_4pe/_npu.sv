@@ -89,13 +89,14 @@ module npu #(
 
     // conv output package module
     logic valid_reg;
+    logic pack_valid;
     logic host_pack_clear;
     logic [31:0] conv1_out_pack;
     logic [23:0] result_reg;
     pack conv_out_pack (
         .clk(clk),
         .rst_n(rst_ni),
-        .in_valid(valid_reg),
+        .in_valid(pack_valid),
         .in_data(result_reg),
         .clear(host_pack_clear),
         .out_data(conv1_out_pack)
@@ -219,6 +220,7 @@ module npu #(
                         state <= S_CONV1_CAL;
                         w_shift <= 1'b1;
                         pe_ready <= 1'b1;
+                        pack_valid <= 1'b1;
                     end
                 end
                 S_CONV1_CAL: begin
@@ -228,6 +230,7 @@ module npu #(
                     state <= S_CONV1_MINUS;
                     pe_ready <= 1'b1;
                     w_shift <= 1'b0;
+                    pack_valid <= 1'b0;
                 end
                 S_CONV1_MINUS: begin
                     pe_ready <= 1'b0;
@@ -241,6 +244,8 @@ module npu #(
                         valid_reg <= 1'b0;
                         state <= S_CONV2_CAL;
                         w_shift <= 1'b1;
+                        pe_ready <= 1'b1;
+                        pack_valid <= 1'b1;
                     end
                 end
                 S_CONV2_CAL: begin
@@ -249,17 +254,22 @@ module npu #(
                     state <= S_CONV2_MINUS;
                     pe_ready <= 1'b1;
                     w_shift <= 1'b0;
+                    pack_valid <= 1'b0;
                 end
                 S_CONV2_MINUS: begin
                     pe_ready <= 1'b0;
                     state <= S_CONV2_LD;
                 end
                 S_FCN: begin
+                    if (host_trigger) pe_ready <= 1'b1;
+                    else pe_ready <= 1'b0;
                     if (host_next_state) begin
                         state <= S_FCN_LAST;
                     end
                 end
                 S_FCN_LAST: begin
+                    if (host_trigger) pe_ready <= 1'b1;
+                    else pe_ready <= 1'b0;
                     if (host_next_state) begin
                         state <= S_DONE;
                     end

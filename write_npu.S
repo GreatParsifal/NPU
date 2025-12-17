@@ -79,7 +79,7 @@ conv1_row_loop:
     beqz  t1, readout
     j     conv1_row_loop
 readout:
-    lui   t5, 0x70006
+    lui   t5, 0x70006       # sel output
     lw    t6, 0(t5)         # read the output
     sw    t6, 0(s3)         # save the output
     addi  s3, s3, 4         # save addr add 4
@@ -93,6 +93,7 @@ readout:
 conv1_row_done:
     addi  t0, t0, -1
 
+    lui   t5, 0x70006       # sel output
     lw    t6, 0(t5)         # read the last output[7:0]
     sw    t6, 0(s3)         # save the output
     addi  s3, s3, 1         # save addr add 1, [31:8] will be covered at next sw
@@ -100,6 +101,7 @@ conv1_row_done:
     j     conv1_col_loop
 conv1_col_done:
     addi  t3, t3, -1
+    lui   s4, 0x60000       # reset image base addr
     j     conv1_chan_loop
 conv1_chan_done:            # finished conv1 calculation, conv2 start
 
