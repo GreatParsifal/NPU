@@ -396,7 +396,6 @@ fcn2_done:
     addi  s3, s3, 2000
     addi  s3, s3, 700
     lw    t6, 0(t5)         # read the output
-    srl   t6, t6, 31        # cal result
     sw    t6, 0(s3)         # save the output
 stop:
     j     stop
