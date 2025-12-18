@@ -485,30 +485,42 @@ module cv32e40p_xilinx (
 	//generate 
 	//	for(i = 0; i < 2; i = i + 1) begin
 `ifdef SIM
-			sram_ff #(
-				.AddrWidth(11),
-				.DataWidth(32)
-			) i_sram (
-				.clk_i(clk_i),
-				.req_i(1'b1),
-				.wen_i(sram_be & {4{sram_we}}),
-				.addr_i(sram_addr[12:2]),
-				.data_i(sram_wdata),
-				.data_o(sram_rdata)
-			);
+	RA1SHD_2048x32M8 i_sram (
+        	.CLK ( clk_i           ),
+        	.A   ( sram_addr[12:2] ),
+        	.CEN ( ~sram_req         ),
+        	.OEN ( 1'b0        ),
+        	.WEN (  ~sram_be | ~{4{sram_we}}           ),
+        	//.BWEB( ~sram_we        ),
+        	//.BWB ( ~sram_be        ),
+        	.D   ( sram_wdata      ),
+        	.Q   ( sram_rdata      )
+    	);
+			
         //assign sram_rdata[i] = sram_reg;
 `else
-	TS1DA32KX32 i_sram (
-		.CLK	(clk_i				),
-		.A		(sram_addr[16:2]	),
-		.CEB	(~sram_req			),
-		.OEB	(1'b0				),
-		.GWEB	(1'b1				),
-		.BWEB	(~sram_we			),
-		.BWB	(~sram_be			),
-		.DIN	(sram_wdata			),
-		.DOUT	(sram_rdata			)
-	);
+	//TS1DA32KX32 i_sram (
+	//	.CLK	(clk_i				),
+	//	.A		(sram_addr[16:2]	),
+	//	.CEB	(~sram_req			),
+	//	.OEB	(1'b0				),
+	//	.GWEB	(1'b1				),
+	//	.BWEB	(~sram_we			),
+	//	.BWB	(~sram_be			),
+	//	.DIN	(sram_wdata			),
+	//	.DOUT	(sram_rdata			)
+	//);
+	RA1SHD_2048x32M8 i_sram (
+        	.CLK ( clk_i           ),
+        	.A   ( sram_addr[12:2] ),
+        	.CEN ( ~sram_req            ),
+        	.OEN ( ~sram_we           ),
+        	.WEN ( sram_we            ),
+        	//.BWEB( ~sram_we        ),
+        	//.BWB ( ~sram_be        ),
+        	.D   ( sram_wdata      ),
+        	.Q   ( sram_rdata      )
+    	);
 			
 `endif	
 
@@ -541,29 +553,52 @@ module cv32e40p_xilinx (
 
 `ifdef SIM
     // 仿真版 8KB（AddrWidth=11 -> 2048 words x 4B = 8KB）
-    sram_ff #(
+    /* sram_ff_d #(
         .AddrWidth(11),
         .DataWidth(32)
-    ) sram_ff_d (
+    ) i_sram_d (
         .clk_i  ( clk_i                    ),
         .req_i  ( 1'b1                     ),
         .wen_i  ( dsram_be & {4{dsram_we}} ),
         .addr_i ( dsram_addr[12:2]         ),
         .data_i ( dsram_wdata              ),
         .data_o ( dsram_rdata              )
-    );
+    ); */
+    RA1SHD_2048x32M8_d i_sram_d (
+        	.CLK ( clk_i           ),
+        	.A   ( dsram_addr[12:2] ),
+        	.CEN ( ~dsram_req         ),
+        	.OEN ( 1'b0           ),
+        	.WEN ( ~dsram_be | ~{4{dsram_we}}         ),
+        	//.BWEB( ~dsram_we        ),
+        	//.BWB ( ~dsram_be        ),
+        	.D   ( dsram_wdata      ),
+        	.Q   ( dsram_rdata      )
+    	);
+			
 `else
     // 工艺 SRAM 宏（占位，按项目替换）
-    TS1DA32KX32 sram_ff_d (
+    //TS1DA32KX32 i_sram_d (
+     //   .CLK ( clk_i            ),
+     //   .A   ( dsram_addr[16:2] ),
+     //   .CEB ( ~dsram_req       ),
+     //   .OEB ( 1'b0             ),
+     //   .GWEB( 1'b1             ),
+     //   .BWEB( ~dsram_we        ),
+     //   .BWB ( ~dsram_be        ),
+     //   .DIN ( dsram_wdata      ),
+     //   .DOUT( dsram_rdata      )
+    //);
+   RA1SHD_2048x32M8 i_sram_d (
         .CLK ( clk_i            ),
         .A   ( dsram_addr[16:2] ),
-        .CEB ( ~dsram_req       ),
-        .OEB ( 1'b0             ),
-        .GWEB( 1'b1             ),
-        .BWEB( ~dsram_we        ),
-        .BWB ( ~dsram_be        ),
-        .DIN ( dsram_wdata      ),
-        .DOUT( dsram_rdata      )
+        .CEN ( ~dsram_req       ),
+        .OEN ( 1'b0             ),
+        .WEN ( 1'b1             ),
+        //.BWEB( ~dsram_we        ),
+        //.BWB ( ~dsram_be        ),
+        .D   ( dsram_wdata      ),
+        .Q   ( dsram_rdata      )
     );
 `endif
 
@@ -657,4 +692,5 @@ module cv32e40p_xilinx (
         end
     end
 endmodule
+
 
