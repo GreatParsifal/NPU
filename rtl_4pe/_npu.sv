@@ -223,8 +223,8 @@ module npu #(
                     end
                 end
                 S_CONV1_CAL: begin
-                    // result_reg <= (pe_sum[23]) ? 24'sd0 : pe_sum; // relu
-                    result_reg <= pe_sum; // using for debug
+                    result_reg <= (pe_sum[23]) ? 24'sd0 : pe_sum; // relu
+                    // result_reg <= pe_sum; // using for debug
                     valid_reg <= 1'b1;
                     state <= S_CONV1_MINUS;
                     pe_ready <= 1'b1;
