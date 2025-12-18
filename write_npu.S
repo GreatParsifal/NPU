@@ -354,7 +354,7 @@ fcn1_input_loop2:
 fcn1_input_done2:
     lui   t5, 0x70006
     lw    t6, 0(t5)         # read the output
-    lw    t2, 0(s5)         # relu
+    srl   t2, t6, 31
     beqz  t2, fcn1_jump_relu
     lui   t6, 0x00000
 fcn1_jump_relu:
