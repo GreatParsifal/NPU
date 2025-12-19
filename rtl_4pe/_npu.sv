@@ -178,10 +178,10 @@ module npu #(
                 pe_input_sel[2] = fcn_in[31:24];
             end
             S_FCN_LAST: begin // 2 input multiplied with 2 weights, 5 cycles of calculation are needed for the whole layer
-                pe_input_sel[0] = {1'b0, fcn_in[7:0]};
-                pe_input_sel[1] = {1'b0, fcn_in[15:8]};
-                pe_w_sel[0] = fcn_in[23:16];
-                pe_w_sel[1] = fcn_in[31:24];
+                pe_input_sel[0] = {1'b0, fcn_in[23:16]};
+                pe_input_sel[1] = {1'b0, fcn_in[31:24]};
+                pe_w_sel[0] = fcn_in[7:0];
+                pe_w_sel[1] = fcn_in[15:8];
             end
             default: begin
                 pe_w_sel[0] = 8'b0;
