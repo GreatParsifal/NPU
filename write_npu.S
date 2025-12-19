@@ -387,6 +387,10 @@ fcn2_loop:
     addi  s4, s4, 2
     sw    t2, 0(t5)       # load input
 
+    lui    t5, 0x70004
+    li    t6, 1
+    sw    t6, 0(t5)         # trigger signal
+
     addi  t0, t0, -1
     j     fcn2_loop
 fcn2_done:
