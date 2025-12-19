@@ -301,8 +301,8 @@ module npu #(
             S_CONV2_MINUS: result_sel = {{8{result_reg[23]}}, result_reg};
             S_FCN: begin
                 result_sel[7:0] = pe_out[0][23] ? 8'b0 : pe_out[0][7:0];
-                result_sel[15:8] = pe_out[0][23] ? 8'b0 : pe_out[0][15:8];
-                result_sel[23:16] = pe_out[0][23] ? 8'b0 : pe_out[0][23:16];
+                result_sel[15:8] = pe_out[1][23] ? 8'b0 : pe_out[1][15:8];
+                result_sel[23:16] = pe_out[2][23] ? 8'b0 : pe_out[2][23:16];
                 result_sel[31:24] = 8'b0;
             end
             S_FCN_LAST: result_sel = {{8{pe_sum[23]}}, pe_sum};       // relu in cpu
