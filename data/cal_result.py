@@ -3,6 +3,7 @@ from network_structure import *
 if __name__ == "__main__":
     input = load_input("./input_32bit.hex")
     input = input.reshape(1, 1, 16, 15)
+    print(input)
 
     x = torch.tensor(input, dtype=torch.uint8)
 

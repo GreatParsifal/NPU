@@ -6,7 +6,7 @@ if __name__ == "__main__":
     for chan in range(10):
         for row in range(3):
             for col in range(3):
-                val = conv1_weight[chan, 0, row, col]
+                val = conv1_weight[chan, 0, col, row]
                 # np.int8转无符号8位整数
                 val = int(val) & 0xFF
                 hex_str = format(val, '02X')
@@ -14,7 +14,7 @@ if __name__ == "__main__":
     for chan in range(10):
         for row in range(3):
             for col in range(3):
-                val = conv2_weight[0, chan, row, col]
+                val = conv2_weight[0, chan, col, row]
                 # np.int8转无符号8位整数
                 val = int(val) & 0xFF
                 hex_str = format(val, '02X')

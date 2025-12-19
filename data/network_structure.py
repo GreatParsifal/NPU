@@ -121,19 +121,19 @@ def load_input(file_path):
     # Read the file as a string of hex values
     with open(file_path, 'r') as f:
         data = f.read().splitlines()
-    
+    # print(data)
     # Convert each space-separated hex string to integer
-    weights = []
+    inputs = []
     for line in data:
-        for i in range(4):
-            val = line[7-i*2-1:7-i*2]
+        # print(line)
+        for i in range(8, 0, -2):
+            val = line[i-2:i]
             # Handle two's complement for negative numbers in int8 range
             int_val = int(val, 16)  # Convert hex string to integer
-            if int_val > 127:  # If the value is above 127, it should be a negative number
-                int_val -= 256  # Convert to signed 8-bit integer (two's complement)
-            weights.append(int_val)
+            # print(int_val)
+            inputs.append(int_val)
     
-    return np.array(weights, dtype=np.int8)
+    return np.array(inputs, dtype=np.uint8)
 
 # Use the function to load weights
 conv1_weight = load_hex_weights('./conv1_weight.txt')
@@ -143,9 +143,17 @@ fc2_weight = load_hex_weights('./fc2_weight.txt')
 
 # For conv2_weight, reshape the 9x10 matrix to 3x3x10x1
 conv1_weight = conv1_weight.reshape(10, 1, 3, 3)  # Reshaping 9x10 to 3x3x10x1
+print("conv1_weight")
+print(conv1_weight)
 conv2_weight = conv2_weight.reshape(1, 10, 3, 3)  # Reshaping 9x10 to 3x3x10x1
+print("conv2_weight")
+print(conv2_weight)
 fc1_weight = fc1_weight.reshape(10, 132)  # Reshaping 9x10 to 3x3x10x1
+print("fcn1_weight")
+print(fc1_weight)
 fc2_weight = fc2_weight.reshape(1, 10)
+print("fc2_weight")
+print(fc2_weight)
 
 # Bias initialization (zero)
 conv1_bias = np.zeros(10, dtype=np.int8)
