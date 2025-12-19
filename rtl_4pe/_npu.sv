@@ -26,14 +26,12 @@ module npu #(
 
     //conv layer
     logic [7:0] in_img  [0:K_H-1]; // interface
-    logic signed [7:0] img_pos[0:K_H-1];
-    logic signed [7:0] img_neg[0:K_H-1];
+    logic signed [7:0] img[0:K_H-1][0:K_W-1];
     logic host_img_clear;
 
     logic signed [7:0] in_conv_w [0:K_H-1];
-    logic signed [7:0] conv_w   [0:K_H-1];
+    logic signed [7:0] conv_w   [0:K_H-1][0:K_W-1];
     logic host_conv_w_clear;
-    logic w_shift;
 
     logic signed [23:0] pe_out[0:K_H-1];
     logic signed [23:0] pe_sum;
@@ -57,14 +55,13 @@ module npu #(
             img_load_en <= 1'b0;
         end
     end
-    cir_reg_img #(K_H, K_W) img (
+    cir_reg #(K_H, K_W) img_win (
         .clk(clk),
         .rst_n(rst_ni),
         .clear(host_img_clear),
         .load_en(img_load_en),
         .in_data(in_img),
-        .out_data1(img_pos),
-        .out_data2(img_neg)
+        .register_img(img)
     );
 
     logic w_load_en;
@@ -77,14 +74,13 @@ module npu #(
             w_load_en <= 1'b0;
         end
     end
-    cir_reg_w #(K_H, K_W) weight (
+    cir_reg #(K_H, K_W) w_win (
         .clk(clk),
         .rst_n(rst_ni),
         .clear(host_conv_w_clear),
         .load_en(w_load_en),
         .in_data(in_conv_w),
-        .out_data1(conv_w),
-        .shift(w_shift)
+        .register_w(conv_w)
     );
 
     // conv output package module
@@ -155,7 +151,7 @@ module npu #(
                 pe_input_sel[0] = ~{1'b0, img_neg[0]}+1'b1;
                 pe_input_sel[1] = ~{1'b0, img_neg[1]}+1'b1;
                 pe_input_sel[2] = ~{1'b0, img_neg[2]}+1'b1;
-                pe_w_sel = conv_w;
+                pe_w_sel = conv_w_minus;
             end
             S_CONV2_CAL: begin
                 pe_input_sel[0] = {1'b0, img_pos[0]};
@@ -167,7 +163,7 @@ module npu #(
                 pe_input_sel[0] = ~{1'b0, img_neg[0]}+1'b1;
                 pe_input_sel[1] = ~{1'b0, img_neg[1]}+1'b1;
                 pe_input_sel[2] = ~{1'b0, img_neg[2]}+1'b1;
-                pe_w_sel = conv_w;
+                pe_w_sel = conv_w_minus;
             end
             S_FCN: begin // 1 input multiplied with weight from 3 channels
                 pe_w_sel[0] = {1'b0, fcn_in[7:0]};
@@ -205,7 +201,6 @@ module npu #(
             valid_reg <= 1'b0;
             result_reg <= 24'sd0;
             done_reg <= 1'b0;
-            w_shift <= 0;
         end else begin
             unique case (state)
                 S_IDLE: begin
@@ -218,7 +213,6 @@ module npu #(
                     if (host_trigger) begin
                         valid_reg <= 1'b0;
                         state <= S_CONV1_CAL;
-                        w_shift <= 1'b1;
                         pe_ready <= 1'b1;
                     end
                 end
@@ -228,7 +222,6 @@ module npu #(
                     valid_reg <= 1'b1;
                     state <= S_CONV1_MINUS;
                     pe_ready <= 1'b1;
-                    w_shift <= 1'b0;
                     pack_valid <= 1'b1;
                 end
                 S_CONV1_MINUS: begin
@@ -243,7 +236,6 @@ module npu #(
                     if (host_trigger) begin
                         valid_reg <= 1'b0;
                         state <= S_CONV2_CAL;
-                        w_shift <= 1'b1;
                         pe_ready <= 1'b1;
                     end
                 end
@@ -252,7 +244,6 @@ module npu #(
                     valid_reg <= 1'b1;
                     state <= S_CONV2_MINUS;
                     pe_ready <= 1'b1;
-                    w_shift <= 1'b0;
                     pack_valid <= 1'b1;
                 end
                 S_CONV2_MINUS: begin

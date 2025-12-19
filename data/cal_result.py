@@ -4,6 +4,10 @@ if __name__ == "__main__":
     input = load_input("./input_32bit.hex")
     input = input.reshape(1, 1, 16, 15)
     print(input)
+    for i in range(3):
+        for j in range(3):
+            print(input[0, 0, 1+i, 5+j], end=' ')
+        print()
 
     x = torch.tensor(input, dtype=torch.uint8)
 
@@ -15,8 +19,9 @@ if __name__ == "__main__":
     sram_res = []
     # conv1
     x = quantized_conv2d(x, model.q_conv1_w, model.q_conv1_b)
-    x = quantized_relu8(x)
+    # x = quantized_relu8(x)
     print("Shape of x:", x.shape)
+    print(x)
     _, chan, col, row = x.shape
     for ch in range(chan):
         for c in range(col):
@@ -30,7 +35,7 @@ if __name__ == "__main__":
     # conv2
     x = quantized_conv3d(x, model.q_conv2_w, model.q_conv2_b)  # Use 3D convolution
     print("Shape of x:", x.shape)
-    x = quantized_relu8(x)
+    # x = quantized_relu8(x)
     chan, _, col, row = x.shape
     for ch in range(chan):
         for c in range(col):
@@ -46,7 +51,7 @@ if __name__ == "__main__":
     print("Shape of x:", x.shape)
     x = quantized_linear(x, model.q_fc1_w, model.q_fc1_b)
     print("Shape of x:", x.shape)
-    x = quantized_relu8(x)
+    # x = quantized_relu8(x)
     chan, row = x.shape
     for ch in range(chan):
         for r in range(row):

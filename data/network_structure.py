@@ -10,8 +10,8 @@ def quantize_int8(tensor, is_weight=False):
     else:
         return torch.clamp(tensor.round(), 0, 255).to(torch.uint8)
 
-def quantized_relu8(x):
-   return torch.clamp(x, 0, 255).to(torch.uint8)
+# def quantized_relu8(x):
+#    return torch.clamp(x, 0, 255).to(torch.uint8)
 
 def mac_24bit(input_patch, weight, bias=None):
     inp = input_patch.to(torch.int32)
@@ -86,15 +86,15 @@ class QuantizedCNN(nn.Module):
     def forward(self, x):
         x = quantized_conv2d(x, self.q_conv1_w, self.q_conv1_b)
         #print("Shape of x:", x.shape)
-        x = quantized_relu8(x)
+        # x = quantized_relu8(x)
         x = quantized_conv3d(x, self.q_conv2_w, self.q_conv2_b)  # Use 3D convolution
         #print("Shape of x:", x.shape)
-        x = quantized_relu8(x)
+        # x = quantized_relu8(x)
         x = x.view(x.size(0), -1)  # Flatten for fully connected layers
         #print("Shape of x:", x.shape)
         x = quantized_linear(x, self.q_fc1_w, self.q_fc1_b)
         #print("Shape of x:", x.shape)
-        x = quantized_relu8(x)
+        # x = quantized_relu8(x)
         x = quantized_linear(x, self.q_fc2_w, self.q_fc2_b)
         #print("Shape of x:", x.shape)
         return x

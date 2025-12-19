@@ -1,4 +1,4 @@
-module cir_reg_img # (
+module cir_reg # (
     K_H = 3,
     K_W = 3
 )(
@@ -7,37 +7,27 @@ module cir_reg_img # (
     input  logic                  load_en,
     input  logic                  clear,
     input  logic [7:0]     in_data [0:K_H-1],
-    output logic [7:0]     out_data1 [0:K_H-1], // positive port
-    output logic [7:0]     out_data2 [0:K_H-1]  // negative port
+    output logic [7:0]     register [0:K_H-1][0:K_W-1];
 );
 
-    logic [7:0] register_img [0:K_H-1][0:K_W-1];
     integer i, j;
 
-    // load input data into circular register_img
+    // load input data into circular register_w
     always_ff @(posedge clk) begin
         if (!rst_n || clear) begin
             for (i=0;i<K_H;i=i+1) begin
                 for (j=0;j<K_W;j=j+1) begin
-                    register_img[i][j] <= 8'd0;
+                    register_w[i][j] <= 8'd0;
                 end
             end
         end else if (load_en) begin
             for (i=K_H-1;i>=0;i=i-1) begin
                 for (j=K_W-1;j>0;j=j-1) begin
-                    register_img[i][j] <= register_img[i][j-1];
+                    register_w[i][j] <= register_w[i][j-1];
                 end
-                register_img[i][0] <= in_data[i];
+                register_w[i][0] <= in_data[i];
             end
         end
     end
-
-    genvar gi;
-    generate
-        for (gi=0;gi<K_H;gi=gi+1) begin : gen_out_data
-            assign out_data1[gi] = register_img[gi][0];
-            assign out_data2[gi] = register_img[gi][K_W-1];
-        end
-    endgenerate
 
 endmodule
