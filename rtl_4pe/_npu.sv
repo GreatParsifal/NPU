@@ -83,35 +83,44 @@ module npu #(
         .register_w(conv_w)
     );
 
+    // conv win calculation module ( 9 pe )
+    logic signed [23:0] conv_out;
+    conv_unit #(K_H, K_W) conv_pe (
+        .clk(clk),
+        .ready(pe_ready),
+        .img(img),
+        .w(conv_w),
+        .result(conv_out)
+    )
+
     // conv output package module
-    logic valid_reg;
-    logic pack_valid;
+    logic pack_in_valid;
     logic host_pack_clear;
     logic [31:0] conv1_out_pack;
     logic [23:0] result_reg;
     pack conv_out_pack (
         .clk(clk),
         .rst_n(rst_ni),
-        .in_valid(pack_valid),
+        .in_valid(pack_in_valid),
         .in_data(result_reg),
         .clear(host_pack_clear),
         .out_data(conv1_out_pack)
     );
 
-    // pe generate
-    logic signed [8:0] pe_input_sel [0:K_H-1];
-    logic signed [7:0] pe_w_sel [0:K_H-1];
+    // fcn pe generate
+    logic signed [8:0] fcn_in_sel [0:K_H-1];
+    logic signed [7:0] fcn_w_sel [0:K_H-1];
     logic host_pe_clear;
     genvar gi;
     generate
         for (gi = 0; gi < K_H; gi = gi + 1) begin : PE_GEN
-            pe_unit_fcn pe_conv_inst (
+            pe_unit_fcn pe_fcn (
                 .clk(clk),
                 .rst_n(rst_ni),
                 .clr(host_pe_clear),
                 .ready(pe_ready),
-                .in_data1(pe_w_sel[gi]),
-                .in_data2(pe_input_sel[gi]),
+                .in_data1(fcn_w_sel[gi]),
+                .in_data2(fcn_in_sel[gi]),
                 .outdata(pe_out[gi])
             );
         end
@@ -123,15 +132,9 @@ module npu #(
     typedef enum logic [3:0] {
         S_IDLE,
         S_CONV1_LD,  // load parameters
-        S_CONV1_PRE_CAL1, // first and second cycle for the first conv_win
-        S_CONV1_PRE_CAL2,
         S_CONV1_CAL, // calculate
-        S_CONV1_MINUS,
         S_CONV2_LD,
-        S_CONV2_PRE_CAL1,
-        S_CONV2_PRE_CAL2,
         S_CONV2_CAL,
-        S_CONV2_MINUS,
         S_FCN,
         S_FCN_LAST,
         S_DONE
@@ -139,53 +142,29 @@ module npu #(
     state_e state;
 
     // pe input selection
-    always_comb begin : pe_sel_logic
+    always_comb begin : fcn_pe_sel_logic
         unique case (state)
-            S_CONV1_CAL: begin
-                pe_input_sel[0] = {1'b0, img_pos[0]};
-                pe_input_sel[1] = {1'b0, img_pos[1]};
-                pe_input_sel[2] = {1'b0, img_pos[2]};
-                pe_w_sel = conv_w;
-            end
-            S_CONV1_MINUS: begin
-                pe_input_sel[0] = ~{1'b0, img_neg[0]}+1'b1;
-                pe_input_sel[1] = ~{1'b0, img_neg[1]}+1'b1;
-                pe_input_sel[2] = ~{1'b0, img_neg[2]}+1'b1;
-                pe_w_sel = conv_w_minus;
-            end
-            S_CONV2_CAL: begin
-                pe_input_sel[0] = {1'b0, img_pos[0]};
-                pe_input_sel[1] = {1'b0, img_pos[1]};
-                pe_input_sel[2] = {1'b0, img_pos[2]};
-                pe_w_sel = conv_w;
-            end
-            S_CONV2_MINUS: begin
-                pe_input_sel[0] = ~{1'b0, img_neg[0]}+1'b1;
-                pe_input_sel[1] = ~{1'b0, img_neg[1]}+1'b1;
-                pe_input_sel[2] = ~{1'b0, img_neg[2]}+1'b1;
-                pe_w_sel = conv_w_minus;
-            end
             S_FCN: begin // 1 input multiplied with weight from 3 channels
-                pe_w_sel[0] = {1'b0, fcn_in[7:0]};
-                pe_w_sel[1] = {1'b0, fcn_in[15:8]};
-                pe_w_sel[2] = {1'b0, fcn_in[23:16]};
-                pe_input_sel[0] = fcn_in[31:24];
-                pe_input_sel[1] = fcn_in[31:24];
-                pe_input_sel[2] = fcn_in[31:24];
+                fcn_w_sel[0] = {1'b0, fcn_in[7:0]};
+                fcn_w_sel[1] = {1'b0, fcn_in[15:8]};
+                fcn_w_sel[2] = {1'b0, fcn_in[23:16]};
+                fcn_in_sel[0] = fcn_in[31:24];
+                fcn_in_sel[1] = fcn_in[31:24];
+                fcn_in_sel[2] = fcn_in[31:24];
             end
             S_FCN_LAST: begin // 2 input multiplied with 2 weights, 5 cycles of calculation are needed for the whole layer
-                pe_input_sel[0] = {1'b0, fcn_in[23:16]};
-                pe_input_sel[1] = {1'b0, fcn_in[31:24]};
-                pe_w_sel[0] = fcn_in[7:0];
-                pe_w_sel[1] = fcn_in[15:8];
+                fcn_in_sel[0] = {1'b0, fcn_in[23:16]};
+                fcn_in_sel[1] = {1'b0, fcn_in[31:24]};
+                fcn_w_sel[0] = fcn_in[7:0];
+                fcn_w_sel[1] = fcn_in[15:8];
             end
             default: begin
-                pe_w_sel[0] = 8'b0;
-                pe_w_sel[1] = 8'b0;
-                pe_w_sel[2] = 8'b0;
-                pe_input_sel[0] = 9'b0;
-                pe_input_sel[1] = 9'b0;
-                pe_input_sel[2] = 9'b0;
+                fcn_w_sel[0] = 8'b0;
+                fcn_w_sel[1] = 8'b0;
+                fcn_w_sel[2] = 8'b0;
+                fcn_in_sel[0] = 9'b0;
+                fcn_in_sel[1] = 9'b0;
+                fcn_in_sel[2] = 9'b0;
             end
         endcase
     end
@@ -198,7 +177,6 @@ module npu #(
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
             state <= S_IDLE;
-            valid_reg <= 1'b0;
             result_reg <= 24'sd0;
             done_reg <= 1'b0;
         end else begin
@@ -207,48 +185,33 @@ module npu #(
                     state <= S_CONV1_LD;
                 end
                 S_CONV1_LD: begin
+                    pack_in_valid <= 1'b0;
                     if (host_next_state) begin
                         state <= S_CONV2_LD;
                     end else
                     if (host_trigger) begin
-                        valid_reg <= 1'b0;
                         state <= S_CONV1_CAL;
                         pe_ready <= 1'b1;
                     end
                 end
                 S_CONV1_CAL: begin
-                    result_reg <= (pe_sum[23]) ? 24'sd0 : pe_sum; // relu
+                    result_reg <= conv_out[23] ? 0 : conv_out; // relu
                     // result_reg <= pe_sum; // using for debug
-                    valid_reg <= 1'b1;
-                    state <= S_CONV1_MINUS;
-                    pe_ready <= 1'b1;
-                    pack_valid <= 1'b1;
-                end
-                S_CONV1_MINUS: begin
-                    pe_ready <= 1'b0;
-                    pack_valid <= 1'b0;
                     state <= S_CONV1_LD;
+                    pack_in_valid <= 1'b1;
                 end
                 S_CONV2_LD: begin
+                    pack_in_valid <= 1'b0;        // don't use conv_pack in conv2 calculation
                     if (host_next_state) begin
                         state <= S_FCN;
                     end else
                     if (host_trigger) begin
-                        valid_reg <= 1'b0;
                         state <= S_CONV2_CAL;
                         pe_ready <= 1'b1;
                     end
                 end
                 S_CONV2_CAL: begin
                     result_reg <= pe_sum; // no relu
-                    valid_reg <= 1'b1;
-                    state <= S_CONV2_MINUS;
-                    pe_ready <= 1'b1;
-                    pack_valid <= 1'b1;
-                end
-                S_CONV2_MINUS: begin
-                    pack_valid <= 1'b0;
-                    pe_ready <= 1'b0;
                     state <= S_CONV2_LD;
                 end
                 S_FCN: begin
@@ -337,7 +300,6 @@ module npu #(
             unique case (sel)
 		        3'd5: douta <= {31'd0, done_reg};
                 3'd6: douta <= result_sel;
-                3'd7: douta <= {31'd0, valid_reg};
                 default: douta <= 32'd0;
             endcase
         end else begin

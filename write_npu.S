@@ -18,30 +18,31 @@ conv1_chan_loop:
     beqz  t3, conv1_chan_done
     
     li    t0, 14            # column_cnt
-conv1_col_loop:             # column loop
+    li    t4, 3
+    lui   s4, 0x60000       # image base addr
+
     lui   t5, 0x70004
     li    t6, 16
-    sw    t6, 0(t5)         # clear weight signal
-    li    t4, 3
-  
-w_conv1_loop:
-    beqz  t4, w_conv1_done
+    sw    t6, 0(t5)         # clear conv_w
+w_conv1_loop:               # load conv_w for the channel
+    beqz  t4, conv1_col_loop
     lw    t2, 0(s2)
     sw    t2, 0(s1)
     addi  s2, s2, 3
     addi  t4, t4, -1
     j     w_conv1_loop      # load weights
-w_conv1_done:
-    addi  s2, s2, -9
-    li    t4, 2             # pre-load count
+
+conv1_col_loop:             # column loop
+    beqz  t0, conv1_col_done
+    li    t4, 2             # img pre-load count
+
+    lui   t5, 0x70004
+    li    t6, 32
+    sw    t6, 0(t5)         # clear pack signal
     lui   t5, 0x70004
     li    t6, 8
-    sw    t6, 0(t5)         # clear input signal
-    lui   t5, 0x70004
-    li    t6, 4
-    sw    t6, 0(t5)         # clear pe signal
+    sw    t6, 0(t5)         # clear input signal, used for debugging
 inn_conv1_loop:
-    beqz  t0, conv1_col_done
     beqz  t4, inn_conv1_done
     addi  t5, s4, -3
     lw    t2, 0(t5)         # in_img[0]
@@ -50,23 +51,15 @@ inn_conv1_loop:
     lw    t6, 0(t5)         # in_img[1]
     srl   t6, t6, 24
     sll   t6, t6, 8
-    add  t2, t2, t6
+    add  t2, t2, t6         # put in_img[1] to [15:8]
     addi  t5, t5, 15
     lw    t6, 0(t5)         # in_img[2]
     srl   t6, t6, 24
     sll   t6, t6, 16
-    add  t2, t2, t6
+    add  t2, t2, t6         # put in_img[2] to [23:16]
     sw    t2, 0(s0)         # load input
-    addi  s4, s4, 1
+    addi  s4, s4, 1         # img addr add 1
     addi  t4, t4, -1
-
-    lui    t5, 0x70004
-    li    t6, 1
-    sw    t6, 0(t5)         # trigger signal
-    lui   t5, 0x70007
-    poll_valid1:
-    lw    t6, 0(t5)
-    beqz  t6, poll_valid1    # wait until valid
     j     inn_conv1_loop    # load 2 input at first
 inn_conv1_done:
     li    t1, 4             # readout cnt
@@ -98,11 +91,6 @@ conv1_row_loop:
     li    t6, 1
     sw    t6, 0(t5)         # trigger signal
 
-    lui   t5, 0x70007
-    poll_valid2:
-    lw    t6, 0(t5)
-    beqz  t6, poll_valid2    # wait until valid
-
     addi  t1, t1, -1
     beqz  t1, readout
     j     conv1_row_loop
@@ -128,8 +116,6 @@ conv1_row_done:
     j     conv1_col_loop
 conv1_col_done:
     addi  t3, t3, -1
-    lui   s4, 0x60000       # reset image base addr
-    addi  s2, s2, 9
     j     conv1_chan_loop
 conv1_chan_done:            # finished conv1 calculation, conv2 start
 
@@ -138,7 +124,7 @@ conv1_chan_done:            # finished conv1 calculation, conv2 start
     sw    t6, 0(t5)         # host_next_state signal
 
     lui   s4, 0x60000
-    addi  s4, s4, 2000   
+    addi  s4, s4, 2000   # conv1 out addr base
     li    t3, 10         # channel_cnt
 conv2_chan_loop:
     beqz  t3, conv2_chan_done
@@ -146,14 +132,12 @@ conv2_chan_loop:
     lui    s5, 0x60000    # addr for conv2 result
     addi   s5, s5, 2000
     addi   s5, s5, 2000
-    li    t4, 2
-    li    t0, 12            # column_cnt
-conv2_col_loop:             # column loop
+
     lui   t5, 0x70004
     li    t6, 16
-    sw    t6, 0(t5)         # clear weight signal
+    sw    t6, 0(t5)         # clear conv_w
 
-    li    t4, 3
+    li     t4, 3
 w_conv2_loop:
     beqz  t4, w_conv2_done
     lw    t2, 0(s2)
@@ -162,19 +146,16 @@ w_conv2_loop:
     addi  t4, t4, -1
     j     w_conv2_loop      # load weights
 w_conv2_done:
-    addi  s2, s2, -9
-
     lui   t5, 0x70004
     li    t6, 8
-    sw    t6, 0(t5)         # clear input signal
+    sw    t6, 0(t5)         # clear input signal, used for debugging
 
-    lui   t5, 0x70004
-    li    t6, 4
-    sw    t6, 0(t5)         # clear pe signal
-
-    li    t4, 2             # set pre-load num
-inn_conv2_loop:
+    li    t0, 12            # column_cnt
+conv2_col_loop:             # column loop
     beqz  t0, conv2_col_done
+
+    li    t4, 2
+inn_conv2_loop:
     beqz  t4, inn_conv2_done
     addi  t5, s4, -3
     lw    t2, 0(t5)         # in_img[0]
@@ -192,13 +173,6 @@ inn_conv2_loop:
     sw    t2, 0(s0)         # load input
     addi  s4, s4, 1
     addi  t4, t4, -1
-    lui    t5, 0x70004
-    li    t6, 1
-    sw    t6, 0(t5)         # trigger signal
-    lui   t5, 0x70007
-    poll_valid3:
-    lw    t6, 0(t5)
-    beqz  t6, poll_valid3    # wait until valid
     j     inn_conv2_loop    # load 2 input at first
 inn_conv2_done:
     li    t4, 11            # row cnt
@@ -220,21 +194,20 @@ conv2_row_loop:
     sw    t2, 0(s0)         # load input
     addi  s4, s4, 1
     addi  t4, t4, -1
+
     lui    t5, 0x70004
     li    t6, 1
     sw    t6, 0(t5)         # trigger signal
-    lui   t5, 0x70007
-    poll_valid4:
-    lw    t6, 0(t5)
-    beqz  t6, poll_valid4    # wait until valid
 
     lui   t5, 0x70006
     lw    t6, 0(t5)         # read the output
-    li    t1, 10            # first time no add
+    li    t1, 10            # first chan no add
     beq   t3, t1, jump_add
+
     lw    t5, 0(s5)         # load previous sum
     add   t6, t6, t5        # accumulate
-    li    t1, 1            # last time relu
+
+    li    t1, 1            # last chan relu
     beq   t3, t1, conv2_relu
 jump_add:
     sw    t6, 0(s5)         # save the output
@@ -254,7 +227,6 @@ conv2_row_done:
     j     conv2_col_loop
 conv2_col_done:
     addi  t3, t3, -1
-    addi  s2, s2, 9
     addi  s4, s4, 26
     j     conv2_chan_loop
 conv2_chan_done:
