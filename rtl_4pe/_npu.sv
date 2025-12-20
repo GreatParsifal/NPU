@@ -61,7 +61,7 @@ module npu #(
         .clear(host_img_clear),
         .load_en(img_load_en),
         .in_data(in_img),
-        .register_img(img)
+        .register(img)
     );
 
     logic w_load_en;
@@ -80,7 +80,7 @@ module npu #(
         .clear(host_conv_w_clear),
         .load_en(w_load_en),
         .in_data(in_conv_w),
-        .register_w(conv_w)
+        .register(conv_w)
     );
 
     // conv win calculation module ( 9 pe )
@@ -91,7 +91,7 @@ module npu #(
         .img(img),
         .w(conv_w),
         .result(conv_out)
-    )
+    );
 
     // conv output package module
     logic pack_in_valid;
@@ -211,7 +211,7 @@ module npu #(
                     end
                 end
                 S_CONV2_CAL: begin
-                    result_reg <= pe_sum; // no relu
+                    result_reg <= conv_out; // no relu
                     state <= S_CONV2_LD;
                 end
                 S_FCN: begin
@@ -249,10 +249,8 @@ module npu #(
         case(state)
             S_CONV1_LD: result_sel = conv1_out_pack;
             S_CONV1_CAL: result_sel = conv1_out_pack;
-            S_CONV1_MINUS: result_sel = conv1_out_pack;
             S_CONV2_LD: result_sel = {{8{result_reg[23]}}, result_reg};            // relu in cpu
             S_CONV2_CAL: result_sel = {{8{result_reg[23]}}, result_reg};
-            S_CONV2_MINUS: result_sel = {{8{result_reg[23]}}, result_reg};
             S_FCN: begin
                 result_sel[7:0] = pe_out[0][23] ? 8'b0 : pe_out[0][7:0];
                 result_sel[15:8] = pe_out[1][23] ? 8'b0 : pe_out[1][15:8];

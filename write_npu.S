@@ -146,13 +146,13 @@ w_conv2_loop:
     addi  t4, t4, -1
     j     w_conv2_loop      # load weights
 w_conv2_done:
-    lui   t5, 0x70004
-    li    t6, 8
-    sw    t6, 0(t5)         # clear input signal, used for debugging
-
     li    t0, 12            # column_cnt
 conv2_col_loop:             # column loop
     beqz  t0, conv2_col_done
+
+    lui   t5, 0x70004
+    li    t6, 8
+    sw    t6, 0(t5)         # clear input signal, used for debugging
 
     li    t4, 2
 inn_conv2_loop:

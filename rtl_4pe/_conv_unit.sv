@@ -1,6 +1,6 @@
 module conv_unit # (
     parameter K_H = 3,
-    parameter K_W = 3,
+    parameter K_W = 3
 )(
     input clk,
     input ready,
