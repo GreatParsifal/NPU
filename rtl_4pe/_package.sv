@@ -20,7 +20,7 @@ endgenerate
 always_ff @(posedge clk) begin
     if (~rst_n || clear) begin
         for (int i=0;i<4;i=i+1) begin
-            register[i] = 8'b0;
+            register[i] <= 8'b0;
         end
         addr <= 2'b0;
     end else if (in_valid) begin
