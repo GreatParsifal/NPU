@@ -20,16 +20,16 @@ if __name__ == "__main__":
         print(f"find error in addr range {err_addr*4} - {err_addr*4+3}")
     
     # check conv2 result
-    conv2_golden = golden[500:500+33]
+    conv2_golden = golden[500:500+132]
     print(conv2_golden[0])
-    conv2_res = res[1000:1000+33]
+    conv2_res = res[1000:1000+132]
     print(conv2_res[0])
     err_addr = -1
-    for i in range(33):
+    for i in range(132):
         if (conv2_golden[i].upper() != conv2_res[i].upper()):
             err_addr = i
             break
     if err_addr == -1:
-        print("conv1 result all right!")
+        print("conv2 result all right!")
     else:
         print(f"find error in addr range {err_addr*4} - {err_addr*4+3}")

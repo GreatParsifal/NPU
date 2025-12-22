@@ -304,11 +304,11 @@ fcn1_input_loop2:
     # writing fcn_in                           ### w_fcn1 distributing should be modified
     lui   t5, 0x70003     # fcn_in addr
     lw    t2, 0(s5)
-    sll   t2, t2, 24      # get one input and put it to [31:24]
+    sll   t2, t2, 24      # get first input and put it to [31:24]
+    srl   t2, t2, 8       # move first input to [23:16]
     addi  s5, s5, 4
     lw    t4, 0(s5)
     sll   t4, t4, 24
-    srl   t4, t4, 8       # move second input to [23:16]
     add   t2, t2, t4
     addi  s5, s5, 4
     addi  t3, s4, -2      # let w_fcn1 [0:2][7:0] be [31:16]
@@ -326,10 +326,6 @@ fcn1_input_loop2:
 fcn1_input_done2:
     lui   t5, 0x70006
     lw    t6, 0(t5)         # read the output
-    srl   t2, t6, 31
-    beqz  t2, fcn1_jump_relu
-    lui   t6, 0x00000
-fcn1_jump_relu:
     sw    t6, 0(s3)         # save the output
     addi  s3, s3, 1
 fcn1_done:
@@ -345,11 +341,11 @@ fcn2_loop:
     # writing fcn_in                           ### w_fcn1 distributing should be modified
     lui   t5, 0x70003     # fcn_in addr
     lw    t2, 0(s3)
-    sll   t2, t2, 24      # get one input and put it to [31:24]
+    sll   t2, t2, 24      # get first input and put it to [31:24]
+    srl   t2, t2, 8       # move first input to [23:16]
     addi  s3, s3, 1
     lw    t4, 0(s3)
     sll   t4, t4, 24
-    srl   t4, t4, 8       # move second input to [23:16]
     add   t2, t2, t4
     addi  s3, s3, 1
     addi  t3, s4, -2      # let w_fcn2 [0:2][7:0] be [31:16]
@@ -374,5 +370,5 @@ fcn2_done:
     lw    t6, 0(t5)         # read the output
     sw    t6, 0(s3)         # save the output
 stop:
-    j     stop
+
     

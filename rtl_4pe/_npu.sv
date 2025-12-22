@@ -145,12 +145,12 @@ module npu #(
     always_comb begin : fcn_pe_sel_logic
         unique case (state)
             S_FCN: begin // 1 input multiplied with weight from 3 channels
-                fcn_w_sel[0] = {1'b0, fcn_in[7:0]};
-                fcn_w_sel[1] = {1'b0, fcn_in[15:8]};
-                fcn_w_sel[2] = {1'b0, fcn_in[23:16]};
-                fcn_in_sel[0] = fcn_in[31:24];
-                fcn_in_sel[1] = fcn_in[31:24];
-                fcn_in_sel[2] = fcn_in[31:24];
+                fcn_w_sel[0] = fcn_in[7:0];
+                fcn_w_sel[1] = fcn_in[15:8];
+                fcn_w_sel[2] = fcn_in[23:16];
+                fcn_in_sel[0] = {1'b0, fcn_in[31:24]};
+                fcn_in_sel[1] = {1'b0, fcn_in[31:24]};
+                fcn_in_sel[2] = {1'b0, fcn_in[31:24]};
             end
             S_FCN_LAST: begin // 2 input multiplied with 2 weights, 5 cycles of calculation are needed for the whole layer
                 fcn_in_sel[0] = {1'b0, fcn_in[23:16]};
@@ -249,15 +249,15 @@ module npu #(
         case(state)
             S_CONV1_LD: result_sel = conv1_out_pack;
             S_CONV1_CAL: result_sel = conv1_out_pack;
-            S_CONV2_LD: result_sel = {{8{result_reg[23]}}, result_reg};            // relu in cpu
+            S_CONV2_LD: result_sel = {{8{result_reg[23]}}, result_reg};            // conv2 relu in cpu
             S_CONV2_CAL: result_sel = {{8{result_reg[23]}}, result_reg};
             S_FCN: begin
                 result_sel[7:0] = pe_out[0][23] ? 8'b0 : pe_out[0][7:0];
-                result_sel[15:8] = pe_out[1][23] ? 8'b0 : pe_out[1][15:8];
-                result_sel[23:16] = pe_out[2][23] ? 8'b0 : pe_out[2][23:16];
+                result_sel[15:8] = pe_out[1][23] ? 8'b0 : pe_out[1][7:0];
+                result_sel[23:16] = pe_out[2][23] ? 8'b0 : pe_out[2][7:0];        // relu
                 result_sel[31:24] = 8'b0;
             end
-            S_FCN_LAST: result_sel = {{8{pe_sum[23]}}, pe_sum};       // relu in cpu
+            S_FCN_LAST: result_sel = pe_sum[23] ? 32'b0 : {24'b0, pe_sum[7:0]};       // relu
             default: result_sel = 32'd0;
         endcase
     end

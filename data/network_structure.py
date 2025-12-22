@@ -21,10 +21,23 @@ def mac_24bit(input_patch, weight, bias=None):
         acc += bias.to(torch.int32)
     #acc = torch.clamp(acc, -2**23, 2**23-1)
     #print(acc)
-    acc = torch.clamp(acc, 0, 2**23-1)
+    acc = torch.clamp(acc, 0, 2**23-1) # relu
     #print(acc)
-    out8 = ((acc ) & 0xFF).to(torch.uint8)
+    out8 = ((acc ) & 0xFF).to(torch.uint8) # cut to uint8
     return out8
+
+def mac_24bit_no_relu(input_patch, weight, bias=None):
+    inp = input_patch.to(torch.int32)
+    w = weight.to(torch.int32)
+    acc = torch.sum(inp * w, dim=(1, 2, 3), keepdim=False)
+    # print("before trans to int32:", acc)
+    if bias is not None:
+        acc += bias.to(torch.int32)
+    acc = acc.to(torch.int32)
+    # print("int32:", acc)
+    acc = torch.clamp(acc, 0, 2**23-1)
+    # print("clamped:", acc)
+    return acc
 
 def quantized_conv2d(x, weight, bias, stride=1):
     N, Cin, H, W = x.shape
@@ -54,6 +67,22 @@ def quantized_conv3d(x, weight, bias, stride=1):
                 for j in range(Wout):
                     patch = x[n, co:co+Kd, i:i+Kh, j:j+Kw]
                     val = mac_24bit(patch, weight[co:co+1], bias[co])
+                    out[n, co, i, j] = val
+    return out
+
+def quantized_conv3d_debug(x, weight, bias, stride=1):
+    N, Cin, H, W = x.shape  # 3D input
+    _, Kd, Kh, Kw = weight.shape  # 3D filter
+    Cout = (Cin - Kd) // stride + 1
+    Hout = (H - Kh) // stride + 1
+    Wout = (W - Kw) // stride + 1
+    out = torch.zeros((N, Cout, Hout, Wout), dtype=torch.uint32)
+    for n in range(N):
+        for co in range(Cout):
+            for i in range(Hout):
+                for j in range(Wout):
+                    patch = x[n, co:co+Kd, i:i+Kh, j:j+Kw]
+                    val = mac_24bit_no_relu(patch, weight[co:co+1], bias[co])
                     out[n, co, i, j] = val
     return out
 
@@ -177,10 +206,15 @@ q_fc2_b = torch.tensor(fc2_bias, dtype=torch.int8)
 model = QuantizedCNN(q_conv1_w, q_conv1_b, q_conv2_w, q_conv2_b, q_fc1_w, q_fc1_b, q_fc2_w, q_fc2_b)
 
 if __name__ == "__main__":
-    sample_input = np.random.randint(0, 255, (5, 1, 16, 15), dtype=np.uint8)  # 5 sample inputs of size 16x15
-    print("Sample Input:", sample_input)
-    # Run inference on a sample input
-    x = torch.tensor(sample_input, dtype=torch.uint8)
+    # sample_input = np.random.randint(0, 255, (5, 1, 16, 15), dtype=np.uint8)  # 5 sample inputs of size 16x15
+    # print("Sample Input:", sample_input)
+    # # Run inference on a sample input
+    # x = torch.tensor(sample_input, dtype=torch.uint8)
+
+    input = load_input("./input_32bit.hex")
+    input = input.reshape(1, 1, 16, 15)
+    print("Case input:\n", input)
+    x = torch.tensor(input, dtype=torch.uint8)
 
     # Quantized inference
     output = model(x)
